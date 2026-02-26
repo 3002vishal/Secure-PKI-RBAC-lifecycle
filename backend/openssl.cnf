@@ -1,0 +1,106 @@
+# ===========================================================
+# MAIN CA SELECTOR
+# ===========================================================
+[ ca ]
+# We set this to intermediate_ca because that's where you issue client certs
+default_ca = intermediate_ca
+
+# ===========================================================
+# ROOT CA SETTINGS
+# ===========================================================
+[ CA_default ]
+dir               = ./demoCA/root
+certs             = $dir/certs
+new_certs_dir     = $dir/newcerts
+database          = $dir/index.txt
+serial            = $dir/serial
+crlnumber         = $dir/crlnumber
+private_key       = $dir/private/ca.key.pem
+certificate       = $dir/ca.cert.pem
+
+default_md        = sha256
+policy            = policy_strict
+default_days      = 3650
+copy_extensions   = none
+
+# ===========================================================
+# INTERMEDIATE CA SETTINGS (The one you use for Clients)
+# ===========================================================
+[ intermediate_ca ]
+dir               = ./demoCA/intermediate
+certs             = $dir/certs
+new_certs_dir     = $dir/newcerts
+database          = $dir/index.txt
+serial            = $dir/serial
+crlnumber         = $dir/crlnumber
+private_key       = $dir/private/int.key.pem
+certificate       = $dir/int.cert.pem
+
+default_md        = sha256
+policy            = policy_loose
+default_days      = 365
+copy_extensions   = none
+
+# CRL specific settings for the intermediate
+crl               = $dir/intermediate.crl
+default_crl_days  = 30
+
+# ===========================================================
+# POLICIES
+# ===========================================================
+[ policy_strict ]
+countryName             = match
+stateOrProvinceName     = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+[ policy_loose ]
+countryName             = optional
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+# ===========================================================
+# EXTENSIONS
+# ===========================================================
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, cRLSign, keyCertSign
+
+[ v3_intermediate_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, cRLSign, keyCertSign
+
+[ usr_cert_dynamic ]
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+# This tells the client where to find the "blacklist"
+crlDistributionPoints = URI:http://localhost:3000/static/intermediate.crl
+
+# YOUR CUSTOM OID FOR ROLES
+1.2.3.4.5.6.7.8.1 = ASN1:UTF8String:$ENV::SERVICE_ROLES
+
+[ v3_crl ]
+# Extensions for the CRL itself
+authorityKeyIdentifier=keyid:always
+
+[ server_cert ]
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+crlDistributionPoints = URI:http://localhost:3000/static/intermediate.crl
