@@ -4,7 +4,7 @@ const path = require("path");
 const forge = require("node-forge");
 const { CERT_DIR, CRL_PATH, OPENSSL_DIR, INTERMEDIATE_DIR } = require("../config/certConfig");
 const { verifyCertificateChain } = require("../services/pkiServices");
-const {getUserDetail} = require("../services/pkiServices")
+const {getUserDetails} = require("../services/pkiServices")
 
 // 1. Define the absolute path to the backend root (Two levels up from controllers)
 const BACKEND_ROOT = path.join(__dirname, "..", "..");
@@ -162,10 +162,10 @@ exports.verify = (req, res) => {
     }
 };
 
-exports.userList = (res, res) => {
+exports.getUserList = (req, res) => {
   try{
     const indexPath = path.join(INTERMEDIATE_DIR, "./index.txt");
-    const userdata = getUserDetail(indexPath);
+    const userdata = getUserDetails(indexPath);
     res.json({success: true, userdetail:userdata});
 
 

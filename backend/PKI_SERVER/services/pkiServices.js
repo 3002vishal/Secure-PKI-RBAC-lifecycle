@@ -50,7 +50,7 @@ function verifyCertificateChain(certPem) {
 /**
  * Reads the OpenSSL index.txt file and returns a parsed list of certificates
  */
-getUserDetails = (indexPath) => {
+ function getUserDetails(indexPath)  {
     if (!fs.existsSync(indexPath)) throw new Error("Index file not found");
 
     const fileContent = fs.readFileSync(indexPath, "utf8");
