@@ -74,6 +74,7 @@ exports.enroll = (req, res) => {
 exports.revoke = (req, res) => {
     const { username } = req.body;
 
+    // console.log(username);
     // 1. Get the path to the original user cert to find its serial
     const userCertPath = path.join(CERT_DIR, `${username}_cert.pem`);
 
