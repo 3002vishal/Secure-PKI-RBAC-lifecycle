@@ -2,8 +2,9 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const forge = require("node-forge");
-const { CERT_DIR, CRL_PATH, OPENSSL_DIR } = require("../config/certConfig");
+const { CERT_DIR, CRL_PATH, OPENSSL_DIR, INTERMEDIATE_DIR } = require("../config/certConfig");
 const { verifyCertificateChain } = require("../services/pkiServices");
+const {getUserDetails} = require("../services/pkiServices")
 
 // 1. Define the absolute path to the backend root (Two levels up from controllers)
 const BACKEND_ROOT = path.join(__dirname, "..", "..");
@@ -160,3 +161,19 @@ exports.verify = (req, res) => {
         res.status(500).json({ valid: false, message: "Verification Failed" }); 
     }
 };
+
+exports.getUserList = (req, res) => {
+  try{
+    const indexPath = path.join(INTERMEDIATE_DIR, "./index.txt");
+    const userdata = getUserDetails(indexPath);
+    res.json({success: true, userdetail:userdata});
+
+
+  }
+  catch(err){
+    res.status(500).json({error: "Failed to fetch registry", details: err.message});
+  }
+};
+
+
+

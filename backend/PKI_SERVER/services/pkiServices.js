@@ -46,4 +46,29 @@ function verifyCertificateChain(certPem) {
   }
 }
 
-module.exports = { isCertificateRevoked, verifyCertificateChain };
+
+/**
+ * Reads the OpenSSL index.txt file and returns a parsed list of certificates
+ */
+ function getUserDetails(indexPath)  {
+    if (!fs.existsSync(indexPath)) throw new Error("Index file not found");
+
+    const fileContent = fs.readFileSync(indexPath, "utf8");
+    return fileContent.split("\n")
+        .filter(line => line.trim() !== "")
+        .map(line => {
+            const parts = line.split("\t");
+            const dn = parts[5] || "";
+            const cnMatch = dn.match(/CN=([^/,\s]+)/);
+
+            return {
+                status: parts[0] === 'V' ? 'Valid' : parts[0] === 'R' ? 'Revoked' : 'Expired',
+                expiration: parts[1],
+                revocationDate: parts[2] !== '' ? parts[2] : null,
+                serial: parts[3],
+                username: cnMatch ? cnMatch[1] : "Unknown"
+            };
+        });
+};
+
+module.exports = { isCertificateRevoked, verifyCertificateChain ,getUserDetails};
