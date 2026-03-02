@@ -9,12 +9,13 @@ import Pki from "./components/services/Pki.js";
 import Security from "./components/services/Security.js";
 import Hsm from "./components/services/Hsm.js"; 
 import Zerotrust from "./components/services/Zerotrust.js";
+import AdminDashboard from "./components/AdminDashboard";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element= {<Enroll/>}/>
+        <Route path="/" element= {<AdminDashboard/>}/>
         <Route path="/Login" element={<Login />} />
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/services" element={<ServicesSection/>}/>

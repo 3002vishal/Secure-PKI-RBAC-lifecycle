@@ -71,4 +71,4 @@ function verifyCertificateChain(certPem) {
         });
 };
 
-module.exports = { isCertificateRevoked, verifyCertificateChain ,getUserDetails};
+module.exports = { isCertificateRevoked , verifyCertificateChain ,getUserDetails};

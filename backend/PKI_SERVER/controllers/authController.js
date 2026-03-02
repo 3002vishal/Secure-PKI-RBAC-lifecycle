@@ -1,8 +1,8 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { CERT_DIR } = require("../config/certConfig");
-const { verifyCertificateChain } = require("../services/pkiServices");
+const { CERT_DIR, INTERMEDIATE_DIR } = require("../config/certConfig");
+const { isCertificateRevoked, verifyCertificateChain } = require("../services/pkiServices");
 const { getServiceRoles } = require("../services/roleServices");
 let { challenges } = require("../middleware/authMiddleware");
 
@@ -15,7 +15,7 @@ exports.getChallenge = (req, res) => {
 exports.login = (req, res) => {
   const { username, signature } = req.body;
   const challenge = challenges[username];
-  
+
   if (!username || !signature || !challenge) return res.status(400).json({ error: "Invalid request" });
 
   const certPath = path.join(CERT_DIR, `${username}_cert.pem`);
@@ -23,7 +23,11 @@ exports.login = (req, res) => {
 
   try {
     const certPem = fs.readFileSync(certPath, "utf8");
-    if (!verifyCertificateChain(certPem)) throw new Error("Verification Failed (Revoked, Expired, or Untrusted)");
+
+
+    if (!isCertificateRevoked(certPem)) {
+      return res.status(403).json({ error: "certificate is revoked" });
+    }
 
     const publicKey = crypto.createPublicKey(certPem);
     const valid = crypto.verify("sha256", Buffer.from(challenge), publicKey, Buffer.from(signature, "base64"));
