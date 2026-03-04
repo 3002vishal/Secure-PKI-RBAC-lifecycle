@@ -1,8 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { CERT_DIR, INTERMEDIATE_DIR } = require("../config/certConfig");
-const { isCertificateRevoked, verifyCertificateChain } = require("../services/pkiServices");
+const { CERT_DIR, INTERMEDIATE_DIR } = require("../config/certConfig")
 const { getServiceRoles } = require("../services/roleServices");
 let { challenges } = require("../middleware/authMiddleware");
 
@@ -23,12 +22,6 @@ exports.login = (req, res) => {
 
   try {
     const certPem = fs.readFileSync(certPath, "utf8");
-
-
-    if (!isCertificateRevoked(certPem)) {
-      return res.status(403).json({ error: "certificate is revoked" });
-    }
-
     const publicKey = crypto.createPublicKey(certPem);
     const valid = crypto.verify("sha256", Buffer.from(challenge), publicKey, Buffer.from(signature, "base64"));
 
@@ -37,6 +30,7 @@ exports.login = (req, res) => {
     delete challenges[username];
     res.json({ success: true, user: username, roles: getServiceRoles(username) });
   } catch (err) {
+    console.log("error happened");
     return res.status(403).json({ error: err.message });
   }
 };

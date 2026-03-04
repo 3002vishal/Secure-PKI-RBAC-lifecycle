@@ -55,7 +55,7 @@ const AdminDashboard = () => {
   const filteredUsers = useMemo(() => {
     return users
       .filter(user => {
-        const matchesName = user.username.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesName = user.username.toLowerCase().includes(searchTerm.toLowerCase()) && user.username!=="admin";
         const matchesStatus = statusFilter === 'All' || user.status === statusFilter;
         return matchesName && matchesStatus;
       })

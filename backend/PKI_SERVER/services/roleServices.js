@@ -13,6 +13,7 @@ function getServiceRoles(username) {
     if (!roleExt || !roleExt.value) return {};
     const raw = roleExt.value.toString("utf8");
     const jsonMatch = raw.match(/\{.*\}/);
+    console.log("jsonMatch",jsonMatch);
     return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
   } catch { return {}; }
 }
