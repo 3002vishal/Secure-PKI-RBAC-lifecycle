@@ -13,14 +13,16 @@ import Zerotrust from "./components/services/Zerotrust.js";
 import AdminDashboard from "./components/AdminDashboard";
 
 function App() {
+  // Add this temporary debugging block
+
   return (
     <BrowserRouter>
       <Routes>
         {/* Admin Route */}
-        <Route path="/" element={<AdminDashboard />} />
+        <Route path="/" element={< Login/>} />
         
         {/* Auth Routes */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard/>} />
         <Route path="/enroll" element={<Enroll />} />
         
         {/* Service Routes */}
