@@ -289,7 +289,7 @@ export default function App() {
                     <Button 
                       variant="outlined" 
                       color="primary"
-                      href="/login"
+                      href="/"
                       startIcon={<LoginIcon />}
                     >
                       Go to Login
@@ -482,7 +482,7 @@ export default function App() {
               <Button 
                 variant="contained" 
                 size="large" 
-                href="/login"
+                href="/"
                 sx={{ mt: 3 }}
               >
                 Proceed to Login
