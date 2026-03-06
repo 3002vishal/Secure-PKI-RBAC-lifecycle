@@ -86,7 +86,7 @@ export const useSecureFetch = (username) => {
       if (!apiRes.ok) {
         throw new Error(data.error || "API Request Denied.");
       }
-
+      console.log("data", data);
       return data;
 
     } catch (err) {

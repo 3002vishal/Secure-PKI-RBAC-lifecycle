@@ -280,8 +280,9 @@ app.post('/signup', (req, res) => {
     
     try {
         const scriptPath = getScriptPath('signup.ps1');
+        console.log(0);
         const serviceRolesString = JSON.stringify(serviceRoles);
-
+         console.log("1");
         const ps = spawn('powershell.exe', [
             '-NoProfile', '-ExecutionPolicy', 'Bypass', 
             '-File', scriptPath,
@@ -293,6 +294,7 @@ app.post('/signup', (req, res) => {
             '-state', state,
             '-country', country
         ]);
+        console.log(2);
 
         let scriptOutput = "";
         

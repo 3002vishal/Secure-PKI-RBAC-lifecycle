@@ -142,17 +142,19 @@ exports.revoke = (req, res) => {
 
 exports.verify = (req, res) => {
     const { username } = req.body;
+    
     const certPath = path.join(CERT_DIR, `${username}_cert.pem`);
     if (!fs.existsSync(certPath)) return res.status(404).json({ valid: false, message: "Not found" });
 
     try {
         const certPem = fs.readFileSync(certPath, "utf8");
-        const isValid = verifyCertificateChain(certPem);
+        const {isValid,message} = verifyCertificateChain(certPem);
         const cert = forge.pki.certificateFromPem(certPem);
+        console.log("veriying deatial", verifyCertificateChain(certPem));
 
         res.json({
             valid: isValid,
-            message: isValid ? "Certificate is Valid & Trusted" : "Certificate is Revoked or Expired",
+            message:  message,
             details: { 
                 issuer: cert.issuer.getField('CN') ? cert.issuer.getField('CN').value : "Unknown", 
                 expiration: cert.validity.notAfter 

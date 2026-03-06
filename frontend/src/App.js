@@ -9,24 +9,30 @@ import Pki from "./components/services/Pki.js";
 import Security from "./components/services/Security.js";
 import Hsm from "./components/services/Hsm.js"; 
 import Zerotrust from "./components/services/Zerotrust.js";
+// IMPORTANT: Ensure AdminDashboard is exported as 'default' in its file
 import AdminDashboard from "./components/AdminDashboard";
 
 function App() {
+  // Add this temporary debugging block
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element= {<AdminDashboard/>}/>
-        <Route path="/Login" element={<Login />} />
+        {/* Admin Route */}
+        <Route path="/" element={< Login/>} />
+        
+        {/* Auth Routes */}
+        <Route path="/admin-dashboard" element={<AdminDashboard/>} />
         <Route path="/enroll" element={<Enroll />} />
-        <Route path="/services" element={<ServicesSection/>}/>
-
-        <Route path="/services/zero-trust" element ={<Zerotrust/>}/>
-        <Route path="/services/crypto" element ={<Crypto/>}/>
-        <Route path="/services/identity" element ={<Identity/>}/>
-        <Route path="/services/pki" element ={<Pki/>}/>
-        <Route path="/services/security" element ={<Security/>}/>
-        <Route path="/services/hsm" element ={<Hsm/>}/> 
-
+        
+        {/* Service Routes */}
+        <Route path="/services" element={<ServicesSection />} />
+        <Route path="/services/zero-trust" element={<Zerotrust />} />
+        <Route path="/services/crypto" element={<Crypto />} />
+        <Route path="/services/identity" element={<Identity />} />
+        <Route path="/services/pki" element={<Pki />} />
+        <Route path="/services/security" element={<Security />} />
+        <Route path="/services/hsm" element={<Hsm />} /> 
       </Routes>
     </BrowserRouter>
   );

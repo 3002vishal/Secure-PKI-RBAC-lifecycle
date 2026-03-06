@@ -8,11 +8,15 @@ function isCertificateRevoked(certPem) {
     const userCert = forge.pki.certificateFromPem(certPem);
     const serialNumber = userCert.serialNumber.toLowerCase();
 
+
     if (!fs.existsSync(CRL_PATH)) return false;
+
+    //console.log("crl_path", CRL_PATH);
 
     const revokedSerials = execSync(`openssl crl -inform PEM -in "${CRL_PATH}" -text -noout`)
       .toString()
       .toLowerCase();
+      //console.log("revoked_serial ", revokedSerials);
 
     return revokedSerials.includes(serialNumber);
   } catch (err) {
@@ -31,18 +35,28 @@ function verifyCertificateChain(certPem) {
     if (now < userCert.validity.notBefore || now > userCert.validity.notAfter) {
       throw new Error("Certificate expired or not yet valid");
     }
+    console.log("1");
 
     if (isCertificateRevoked(certPem)) {
       throw new Error("CERTIFICATE REVOKED: Access denied by Administrator");
     }
+    console.log("2");
 
     const caStore = forge.pki.createCaStore([rootCert, intCert]);
     forge.pki.verifyCertificateChain(caStore, [userCert]);
+    console.log("3");
 
-    return true;
+    return {
+      isValid : true, 
+      message: "Success: Certificate is valid"
+    };
   } catch (err) {
+
     console.error("Certificate verification failed:", err.message);
-    return false;
+    return {
+      isValid: false, 
+      message: err.message
+    }
   }
 }
 
