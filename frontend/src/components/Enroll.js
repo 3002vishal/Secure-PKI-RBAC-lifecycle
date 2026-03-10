@@ -23,7 +23,8 @@ import {
   Card,
   CardContent
 } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
+// Icons not used since we removed the download step
+// import DownloadIcon from '@mui/icons-material/Download';
 import SecurityIcon from '@mui/icons-material/Security';
 import PersonIcon from '@mui/icons-material/Person';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
@@ -32,7 +33,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import LockIcon from '@mui/icons-material/Lock';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import LoginIcon from '@mui/icons-material/Login';
+// Icons not used since we removed the download step
+// import LoginIcon from '@mui/icons-material/Login';
 
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -87,20 +89,15 @@ export default function App() {
   ]);
   
   const [showLogs, setShowLogs] = useState(true);
-  const [bridgeDownloaded, setBridgeDownloaded] = useState(false);
-
-  // CHANGED: Ref now points to the Container, not a div at the bottom
+  
   const logContainerRef = useRef(null);
 
-  // CHANGED: Scroll logic now targets the container's scrollTop
-  // This ensures ONLY the box scrolls internally, not the whole window
   useEffect(() => {
     if (logContainerRef.current) {
       const { scrollHeight, clientHeight } = logContainerRef.current;
-      // Scroll to bottom of the specific container
       logContainerRef.current.scrollTop = scrollHeight - clientHeight;
     }
-  }, [logs]); // Runs whenever logs update
+  }, [logs]);
 
   const addLog = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -138,11 +135,8 @@ export default function App() {
   };
 
   const handleNext = () => {
-    if (activeStep === 0 && !bridgeDownloaded) {
-      setStatus({ type: 'warning', msg: 'Please download the HSM Bridge before proceeding.' });
-      return;
-    }
-    if (activeStep === 1 && !validatePersonalInfo()) {
+    // Current activeStep 0 is 'Personal Details'
+    if (activeStep === 0 && !validatePersonalInfo()) {
       return;
     }
     setStatus({ type: '', msg: '' });
@@ -191,7 +185,8 @@ export default function App() {
         addLog("Hardware token provisioned successfully", "success");
         addLog("Digital certificate installed to secure storage", "success");
         setStatus({ type: 'success', msg: '🎉 Enrollment Complete! Your identity is now secured by hardware.' });
-        setActiveStep(3);
+        // Correcting final step index (Step 2 is complete)
+        setActiveStep(2);
       } else {
         throw new Error(result.message || "Unknown enrollment error");
       }
@@ -209,7 +204,8 @@ export default function App() {
     }
   };
 
-  const steps = ['Download Bridge', 'Personal Details', 'Access Privileges', 'Complete'];
+  // Steps updated
+  const steps = ['Personal Details', 'Access Privileges', 'Complete'];
 
   return (
     <Box sx={{ 
@@ -242,65 +238,6 @@ export default function App() {
           </Stepper>
 
           {activeStep === 0 && (
-            <Box>
-              <Card sx={{ bgcolor: '#f5f5f5', mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <DownloadIcon sx={{ mr: 1, color: '#1976d2' }} />
-                    Required: HSM Bridge Application
-                  </Typography>
-                  <Typography variant="body1" color="textSecondary" paragraph>
-                    The HSM Bridge creates a secure channel between this web interface and your hardware security module. 
-                    This ensures your private keys never leave the secure hardware environment.
-                  </Typography>
-                  <Alert severity="warning" sx={{ mb: 2 }}>
-                    <strong>Important:</strong> You must download and run the HSM Bridge before proceeding with enrollment.
-                  </Alert>
-                  <Button 
-                    variant="contained" 
-                    size="large"
-                    fullWidth
-                    startIcon={<DownloadIcon />}
-                    href="/hsm-bridge.exe" 
-                    download="hsm-bridge.exe"
-                    onClick={() => {
-                      setBridgeDownloaded(true);
-                      addLog("HSM Bridge downloaded successfully", "success");
-                    }}
-                    sx={{ 
-                      height: 56,
-                      background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                      boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
-                    }}
-                  >
-                    Download HSM Bridge (Windows)
-                  </Button>
-                  {bridgeDownloaded && (
-                    <Alert severity="success" sx={{ mt: 2 }}>
-                      ✓ Bridge downloaded. Please run hsm-bridge.exe before continuing.
-                    </Alert>
-                  )}
-
-                  <Divider sx={{ my: 3 }} />
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                    <Typography variant="body1" color="textSecondary">
-                      Already have a certificate and enrolled?
-                    </Typography>
-                    <Button 
-                      variant="outlined" 
-                      color="primary"
-                      href="/"
-                      startIcon={<LoginIcon />}
-                    >
-                      Go to Login
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-
-          {activeStep === 1 && (
             <Box>
               <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                 <PersonIcon sx={{ mr: 1, color: '#1976d2' }} />
@@ -391,7 +328,7 @@ export default function App() {
             </Box>
           )}
 
-          {activeStep === 2 && (
+          {activeStep === 1 && (
             <Box>
               <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <AdminPanelSettingsIcon sx={{ mr: 1, color: '#1976d2' }} />
@@ -459,7 +396,7 @@ export default function App() {
             </Box>
           )}
 
-          {activeStep === 3 && (
+          {activeStep === 2 && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CheckCircleIcon sx={{ fontSize: 100, color: '#4caf50', mb: 2 }} />
               <Typography variant="h4" gutterBottom fontWeight="bold" color="success.main">
@@ -490,13 +427,13 @@ export default function App() {
             </Box>
           )}
 
-          {status.msg && activeStep !== 3 && (
+          {status.msg && activeStep !== 2 && (
             <Alert severity={status.type} sx={{ mt: 3 }}>
               {status.msg}
             </Alert>
           )}
 
-          {activeStep < 3 && (
+          {activeStep < 2 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button
                 disabled={activeStep === 0 || loading}
@@ -506,7 +443,7 @@ export default function App() {
                 Back
               </Button>
               <Box sx={{ flex: 1 }} />
-              {activeStep === 2 ? (
+              {activeStep === 1 ? (
                 <Button
                   variant="contained"
                   size="large"
@@ -534,7 +471,8 @@ export default function App() {
             </Box>
           )}
 
-          {activeStep > 0 && (
+          {/* Corrected log condition to show from start */}
+          {activeStep >= 0 && (
             <Box sx={{ mt: 4 }}>
               <Box 
                 sx={{ 
@@ -555,7 +493,7 @@ export default function App() {
               </Box>
               <Collapse in={showLogs}>
                 <Box 
-                  ref={logContainerRef} // Ref attached to container
+                  ref={logContainerRef}
                   sx={{ 
                     bgcolor: '#1e1e1e', 
                     borderRadius: 2, 

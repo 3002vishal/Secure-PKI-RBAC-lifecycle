@@ -15,7 +15,7 @@ import {
 // Standard MUI Icon imports
 import SecurityIcon from '@mui/icons-material/Security';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import DownloadIcon from '@mui/icons-material/Download'; // Added for the Bridge download
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -24,7 +24,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 // Ensure this path is 100% correct and useSecureFetch is a named export
 import { useSecureFetch } from '../hooks/useSecureFetch';
 
-  function Login() {
+function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   
@@ -35,7 +35,6 @@ import { useSecureFetch } from '../hooks/useSecureFetch';
   const [userRole, setUserRole] = useState(null);
   const [localLoading, setLocalLoading] = useState(false); 
   
-  // Destructure with default values to prevent "undefined" errors
   const { secureFetch, loading: hookLoading, error: hookError } = useSecureFetch(username) || {};
   
   const loading = localLoading || hookLoading;
@@ -52,7 +51,7 @@ import { useSecureFetch } from '../hooks/useSecureFetch';
     setLogs(prev => [...prev, { message, type, timestamp }]);
   };
 
-const handleLogin = async () => {
+  const handleLogin = async () => {
     if (!username.trim()) {
       addLog("Username cannot be empty.", "error");
       return;
@@ -64,7 +63,6 @@ const handleLogin = async () => {
     addLog(`Verifying Certificate Trust Chain for: ${username}...`, "process");
 
     try {
-      // Step 1: Standard Fetch for Certificate Verification
       const verifyRes = await fetch('http://localhost:5000/api/verify-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,18 +79,14 @@ const handleLogin = async () => {
 
       addLog("Certificate Chain Valid & Trusted.", "success");
 
-      // Step 2: Hardware Handshake via useSecureFetch
       addLog(`Initiating Hardware Handshake for ${username}...`, "process");
       
-      // Note: useSecureFetch usually handles the signing headers internally
       const result = await secureFetch('/api/login', {
         method: "POST",
         body: JSON.stringify({ username: username }),
         headers: { "Content-Type": "application/json" }
       });
 
-      // Step 3: Evaluate the Secure Fetch Result
-      // Ensure 'result' matches what your backend returns on success
       if (result && (result.success || result.authenticated)) {
         addLog("Identity Cryptographically Verified.", "success");
         setUserRole("Authenticated"); 
@@ -106,7 +100,6 @@ const handleLogin = async () => {
           navigate(targetPath, { state: { username: username } });
         }, 1500);
       } else {
-        // Handle cases where the hook returns null or success: false
         addLog("Authentication Failed. Signature rejected by server.", "error");
       }
 
@@ -168,11 +161,27 @@ const handleLogin = async () => {
               >
                 {loading ? <CircularProgress size={24} color="inherit" /> : "Login with Token"}
               </Button>
-              <Box textAlign="center" mt={2} mb={2}>
-                <Button color="secondary" onClick={() => navigate('/enroll')} disabled={loading}>
-                  Enroll New User
+
+              <Box sx={{ mt: 3, mb: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  fullWidth
+                  startIcon={<DownloadIcon />}
+                  href="/hsm-bridge.exe" 
+                  download="hsm-bridge.exe"
+                  onClick={() => addLog("HSM Bridge download initiated.", "info")}
+                  sx={{ 
+                    borderStyle: 'dashed',
+                    color: 'text.secondary',
+                    borderColor: 'divider',
+                    '&:hover': { borderColor: 'primary.main', borderStyle: 'solid' }
+                  }}
+                >
+                  Download HSM Bridge
                 </Button>
               </Box>
+
+             
             </Box>
           )}
 
