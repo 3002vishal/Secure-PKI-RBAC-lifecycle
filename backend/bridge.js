@@ -15,9 +15,83 @@ const PORT = 8000;
 // ==========================================
 // 1. POWERSHELL SCRIPTS (Logic)
 // ==========================================
+const MODIFY_ALL_SCRIPT = `
+param(
+    [Parameter(Mandatory=$true)] [string]$username,
+    [Parameter(Mandatory=$true)] [string]$serviceRoles, 
+    [Parameter(Mandatory=$true)] [string]$email,
+    [Parameter(Mandatory=$true)] [string]$orgUnit,
+    [Parameter(Mandatory=$true)] [string]$org,
+    [Parameter(Mandatory=$true)] [string]$state,
+    [Parameter(Mandatory=$true)] [string]$country
+)
 
-// --- SCRIPT A: SIGNUP (Enrollment) ---
-// CHANGE: Switched to 'repairstore' to forcefully fix broken links
+$serverUrl = "http://localhost:5000"
+// ESCAPED BACKTICKS BELOW
+$infFileName = "\$username\`_full_mod.inf"
+$csrFileName = "\$username\`_full_mod.req"
+$responseFileName = "\$username\`_full_mod.cer"
+
+function Output-Json($status, $msg, $data = $null) {
+    $obj = @{ status = $status; message = $msg; data = $data }
+    Write-Output ($obj | ConvertTo-Json -Compress)
+}
+
+try {
+    Write-Host "[MODIFY-ALL] 1. Creating INF with NEW identity details..." -ForegroundColor Cyan
+    $infContent = @"
+[NewRequest]
+Subject = "CN=\$username, E=\$email, OU=\$orgUnit, O=\$org, S=\$state, C=\$country"
+KeyLength = 2048
+KeySpec = 2 
+MachineKeySet = FALSE
+RequestType = PKCS10
+ProviderName = "SafeSign Standard Cryptographic Service Provider"
+ProviderType = 1
+KeyContainer = "\$username"
+[EnhancedKeyUsageExtension]
+OID=1.3.6.1.5.5.7.3.2 
+"@
+
+    $infContent | Out-File -FilePath $infFileName -Encoding ASCII
+
+    Write-Host "[MODIFY-ALL] 2. Generating New Keys & CSR..." -ForegroundColor Cyan
+    certreq -new -q $infFileName $csrFileName
+    $csrContent = [System.IO.File]::ReadAllText("\$PWD\\\\\$csrFileName")
+
+    Write-Host "[MODIFY-ALL] 3. Sending Full Update to Backend..." -ForegroundColor Cyan
+    $payload = @{
+        username     = \$username
+        csr          = \$csrContent
+        serviceRoles = \$serviceRoles
+        email        = \$email
+    } | ConvertTo-Json
+
+    $response = Invoke-RestMethod -Uri "\$serverUrl/api/modify" -Method Post -Body \$payload -ContentType "application/json"
+
+    if (\$response.success) {
+        \$certContent = \$response.certificate
+        \$certContent | Out-File -FilePath \$responseFileName -Encoding ASCII
+
+        Write-Host "[MODIFY-ALL] 4. Binding New Identity Cert to Token..." -ForegroundColor Cyan
+        certreq -accept -q \$responseFileName
+
+        \$tempCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(\$responseFileName)
+        \$thumbprint = \$tempCert.Thumbprint
+        \$null = certutil -user -silent -repairstore -csp "SafeSign Standard Cryptographic Service Provider" My \$thumbprint
+
+        Remove-Item \$infFileName, \$csrFileName, \$responseFileName -ErrorAction SilentlyContinue
+        Output-Json "success" "Identity and Roles updated successfully" \$certContent
+    } else {
+        throw "Server Error: \$(\$response.error)"
+    }
+}
+catch {
+    Output-Json "error" \$_.Exception.Message
+    exit 1
+}
+`;
+
 const SIGNUP_SCRIPT = `
 param(
     [Parameter(Mandatory=$true)] [string]$username,
@@ -229,10 +303,11 @@ function getScriptPath(scriptName) {
     let content = "";
     if (scriptName === 'signup.ps1') content = SIGNUP_SCRIPT;
     else if (scriptName === 'sign.ps1') content = SIGN_SCRIPT;
+    else if(scriptName === 'modify.ps1') content = MODIFY_ALL_SCRIPT;
     else throw new Error("Unknown script requested");
 
     const tempPath = path.join(os.tmpdir(), `hsm-${scriptName}`);
-    try { fs.writeFileSync(tempPath, content); } catch (e) {}
+    try { fs.writeFileSync(tempPath, content); } catch (e) { }
     return tempPath;
 }
 
@@ -245,7 +320,7 @@ app.post('/sign-challenge', (req, res) => {
     try {
         const scriptPath = getScriptPath('sign.ps1');
         const ps = spawn('powershell.exe', [
-            '-NoProfile', '-ExecutionPolicy', 'Bypass', 
+            '-NoProfile', '-ExecutionPolicy', 'Bypass',
             '-File', scriptPath,
             '-ChallengeData', challenge
         ]);
@@ -255,7 +330,7 @@ app.post('/sign-challenge', (req, res) => {
 
         ps.stdout.on('data', (data) => { signature += data.toString().trim(); });
         ps.stderr.on('data', (data) => { errorLog += data.toString(); console.error(data.toString()); });
-        
+
         ps.on('close', (code) => {
             if (code !== 0 || signature.includes("ERROR:") || signature.includes("Signing_Failed")) {
                 console.error("[SIGN] Failed");
@@ -277,17 +352,17 @@ app.post('/signup', (req, res) => {
     }
 
     console.log(`[ENROLL] Starting enrollment for ${username}...`);
-    
+
     try {
         const scriptPath = getScriptPath('signup.ps1');
         console.log(0);
         const serviceRolesString = JSON.stringify(serviceRoles);
-         console.log("1");
+        console.log("1");
         const ps = spawn('powershell.exe', [
-            '-NoProfile', '-ExecutionPolicy', 'Bypass', 
+            '-NoProfile', '-ExecutionPolicy', 'Bypass',
             '-File', scriptPath,
-            '-username', username, 
-            '-serviceRoles', serviceRolesString, 
+            '-username', username,
+            '-serviceRoles', serviceRolesString,
             '-email', email,
             '-orgUnit', orgUnit,
             '-org', org,
@@ -297,17 +372,17 @@ app.post('/signup', (req, res) => {
         console.log(2);
 
         let scriptOutput = "";
-        
-        ps.stdout.on('data', (data) => { 
+
+        ps.stdout.on('data', (data) => {
             const msg = data.toString();
             console.log(msg);
-            scriptOutput += msg; 
+            scriptOutput += msg;
         });
 
-        ps.stderr.on('data', (data) => { 
+        ps.stderr.on('data', (data) => {
             const msg = data.toString();
-            console.error(msg); 
-            scriptOutput += msg; 
+            console.error(msg);
+            scriptOutput += msg;
         });
 
         ps.on('close', (code) => {
@@ -316,14 +391,59 @@ app.post('/signup', (req, res) => {
                 if (jsonStartIndex === -1) throw new Error("No JSON found in output");
                 const cleanJsonString = scriptOutput.substring(jsonStartIndex);
                 const parsedResult = JSON.parse(cleanJsonString);
-                
-                if(parsedResult.status === 'error') {
+
+                if (parsedResult.status === 'error') {
                     res.status(500).json(parsedResult);
                 } else {
                     res.json(parsedResult);
                 }
             } catch (e) {
                 console.error("[ENROLL] Parse Error:", e.message);
+                res.status(500).json({ status: "error", message: "Bridge parse failure", details: scriptOutput });
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: "Execution failure", details: e.message });
+    }
+});
+
+app.post('/modify', (req, res) => {
+    const { username, serviceRoles, email, orgUnit, org, state, country } = req.body;
+
+    // Check for all required fields
+    if (!username || !serviceRoles || !email || !orgUnit || !org || !state || !country) {
+        return res.status(400).json({ status: "error", message: "Missing required identity fields." });
+    }
+
+    console.log(`[MODIFY] Full Identity Update for ${username}...`);
+
+    try {
+        const scriptPath = getScriptPath('modify.ps1'); // Ensure this points to the MODIFY_ALL_SCRIPT
+        const serviceRolesString = typeof serviceRoles === 'string' ? serviceRoles : JSON.stringify(serviceRoles);
+
+        const ps = spawn('powershell.exe', [
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', 
+            '-File', scriptPath,
+            '-username', username, 
+            '-serviceRoles', serviceRolesString,
+            '-email', email,
+            '-orgUnit', orgUnit,
+            '-org', org,
+            '-state', state,
+            '-country', country
+        ]);
+
+        let scriptOutput = "";
+        ps.stdout.on('data', (data) => { scriptOutput += data.toString(); });
+        ps.stderr.on('data', (data) => { console.error(data.toString()); });
+
+        ps.on('close', (code) => {
+            try {
+                const jsonStartIndex = scriptOutput.indexOf('{');
+                if (jsonStartIndex === -1) throw new Error("No JSON found in output");
+                const parsedResult = JSON.parse(scriptOutput.substring(jsonStartIndex));
+                res.status(parsedResult.status === 'error' ? 500 : 200).json(parsedResult);
+            } catch (e) {
                 res.status(500).json({ status: "error", message: "Bridge parse failure", details: scriptOutput });
             }
         });
