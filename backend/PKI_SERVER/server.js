@@ -20,6 +20,7 @@ app.post("/api/enroll", certController.enroll);
 app.post("/api/admin/revoke", certController.revoke);
 app.post("/api/verify-certificate", certController.verify);
 app.get("/api/admin/get-user-detail",certController.getUserList);
+app.post("/api/modify", certController.modify);
 
 // Protected Service Routes (RBAC)
 app.post("/services/zero-trust", 

@@ -178,6 +178,120 @@ exports.getUserList = (req, res) => {
   }
 };
 
+exports.modify = async (req, res) => {
+    const { username, csr, serviceRoles } = req.body;
+
+    // 1. Validation and Type Checking
+    if (!username || !csr || !serviceRoles) {
+        return res.status(400).json({ error: "Missing fields for modification" });
+    }
+
+    const userCertPath = path.join(CERT_DIR, `${username}_cert.pem`);
+
+    if (!fs.existsSync(userCertPath)) {
+        return res.status(404).json({ error: "User certificate not found. Cannot modify/renew." });
+    }
+
+    try {
+        // --- STEP 1: REVOCATION LOGIC ---
+        const certPem = fs.readFileSync(userCertPath, 'utf8');
+        const cert = forge.pki.certificateFromPem(certPem);
+        const serialHex = cert.serialNumber.toLowerCase();
+        
+        const archiveCertPath = path.join(BACKEND_ROOT, "demoCA", "intermediate", "newCErts", `${serialHex.toUpperCase()}.pem`);
+        const finalRevokePath = fs.existsSync(archiveCertPath) ? archiveCertPath : userCertPath;
+
+        const revokeArgs = [
+            "ca", "-config", OPENSSL_DIR, 
+            "-name", "intermediate_ca", 
+            "-revoke", finalRevokePath
+        ];
+
+        const revProcess = spawn("openssl", revokeArgs, { 
+            cwd: BACKEND_ROOT,
+            env: { ...process.env, SERVICE_ROLES: "revocation_mode" } 
+        });
+
+        let revokeStderr = "";
+        revProcess.stderr.on("data", (data) => { revokeStderr += data.toString(); });
+
+        revProcess.on("close", (revokeCode) => {
+            // FIX: If it's already revoked, OpenSSL returns code 1. 
+            // We check the error message to see if we can ignore it and proceed.
+            const isAlreadyRevoked = revokeStderr.includes("ERROR:Already revoked");
+
+            if (revokeCode !== 0 && !isAlreadyRevoked) {
+                return res.status(500).json({ error: "Revocation stage failed", details: revokeStderr });
+            }
+
+            // Update CRL (Certificate Revocation List)
+            const crlArgs = ["ca", "-config", OPENSSL_DIR, "-name", "intermediate_ca", "-gencrl", "-out", CRL_PATH];
+            spawn("openssl", crlArgs, { cwd: BACKEND_ROOT }).on("close", (crlCode) => {
+                
+                // --- STEP 2: ENROLLMENT LOGIC (Re-issue) ---
+                const csrPath = path.join(CERT_DIR, `${username}_req.csr`);
+                const newCertPath = path.join(CERT_DIR, `${username}_cert.pem`);
+
+                // FIX: Ensure CSR is a string. If PowerShell sent an object/array, we normalize it.
+                let normalizedCsr = csr;
+                if (Array.isArray(csr)) {
+                    normalizedCsr = csr.join("\n");
+                } else if (typeof csr !== 'string') {
+                    // This handles the "Received an instance of Object" error
+                    normalizedCsr = String(csr); 
+                }
+
+                try {
+                    fs.writeFileSync(csrPath, normalizedCsr);
+                } catch (fsErr) {
+                    return res.status(500).json({ error: "Failed to write CSR file", details: fsErr.message });
+                }
+
+                const enrollArgs = [
+                    "ca", "-batch", 
+                    "-config", OPENSSL_DIR, 
+                    "-name", "intermediate_ca",
+                    "-in", csrPath, 
+                    "-out", newCertPath,
+                    "-extensions", "usr_cert_dynamic"
+                ];
+                console.log("before modify");
+
+                const enrollProcess = spawn("openssl", enrollArgs, { 
+                    cwd: BACKEND_ROOT,
+                    env: { ...process.env, SERVICE_ROLES: serviceRoles } 
+                });
+                console.log("after modify");
+
+                let enrollStderr = "";
+                enrollProcess.stderr.on("data", (data) => { enrollStderr += data.toString(); });
+
+                enrollProcess.on("close", (enrollCode) => {
+                    if (fs.existsSync(csrPath)) fs.unlinkSync(csrPath);
+
+                    if (enrollCode !== 0) {
+                        return res.status(500).json({ error: "Re-enrollment failed", details: enrollStderr });
+                    }
+
+                    try {
+                        const newCertificate = fs.readFileSync(newCertPath, "utf8");
+                        res.json({ 
+                            success: true, 
+                            message: `Successfully rotated certificate for ${username}`,
+                            certificate: newCertificate 
+                        });
+                    } catch (readErr) {
+                        res.status(500).json({ error: "Read failed after re-issue", details: readErr.message });
+                    }
+                });
+            });
+        });
+
+    } catch (err) {
+        console.error("Modification Error:", err);
+        res.status(500).json({ error: "Internal processing error during modification", details: err.message });
+    }
+};
 
 
 
