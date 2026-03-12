@@ -3,6 +3,10 @@ const cors = require("cors");
 const authController = require("./controllers/authController");
 const certController = require("./controllers/certController");
 const { verifyAccess } = require("./middleware/authMiddleware");
+// top of server.js
+const adminController = require('./controllers/adminController'); // Added the 'r'
+
+// route line
 
 const app = express();
 const PORT = 5000;
@@ -21,6 +25,7 @@ app.post("/api/admin/revoke", certController.revoke);
 app.post("/api/verify-certificate", certController.verify);
 app.get("/api/admin/get-user-detail",certController.getUserList);
 app.post("/api/modify", certController.modify);
+app.get("/api/admin/user-details/:username",adminController.getUserDetailsForEdit);
 
 // Protected Service Routes (RBAC)
 app.post("/services/zero-trust", 

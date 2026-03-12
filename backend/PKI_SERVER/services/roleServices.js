@@ -2,6 +2,7 @@ const forge = require("node-forge");
 const fs = require("fs");
 const path = require("path");
 const { CERT_DIR } = require("../config/certConfig");
+const console = require("console");
 
 function getServiceRoles(username) {
   try {
@@ -17,5 +18,8 @@ function getServiceRoles(username) {
     return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
   } catch { return {}; }
 }
+console.log(getServiceRoles("user6"));
+
+
 
 module.exports = { getServiceRoles };
