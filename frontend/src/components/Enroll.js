@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom'; // Added for navigation state
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Container, 
   Paper, 
@@ -13,16 +13,16 @@ import {
   Box, 
   Alert, 
   CircularProgress,
-  Divider,
-  Grid,
-  Chip,
-  Collapse,
-  IconButton,
-  Stepper,
-  Step,
-  StepLabel,
-  Card,
-  CardContent
+  Divider, 
+  Grid, 
+  Chip, 
+  Collapse, 
+  IconButton, 
+  Stepper, 
+  Step, 
+  StepLabel, 
+  Card, 
+  CardContent 
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import PersonIcon from '@mui/icons-material/Person';
@@ -63,7 +63,6 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // --- MODIFICATION LOGIC START ---
   const editUser = location.state?.editUser; 
   const isEditMode = !!editUser;
 
@@ -90,7 +89,6 @@ export default function App() {
       "Crypto Vault": "NA"
     };
   });
-  // --- MODIFICATION LOGIC END ---
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
@@ -113,7 +111,6 @@ export default function App() {
     }
   }, [logs]);
 
-  // Jump to Step 1 if editing
   useEffect(() => {
     if (isEditMode) setActiveStep(1);
   }, [isEditMode]);
@@ -165,7 +162,6 @@ export default function App() {
     if (!validatePersonalInfo()) return;
 
     setLoading(true);
-    // Dynamic endpoint and message selection
     const endpoint = isEditMode ? 'http://localhost:8000/modify' : 'http://localhost:8000/signup';
     setStatus({ type: 'info', msg: isEditMode ? 'Rotating keys and updating certificate...' : 'Initiating secure hardware enrollment...' });
     
@@ -181,7 +177,6 @@ export default function App() {
         body: JSON.stringify({ username, serviceRoles, email, orgUnit, org, state, country })
       });
 
-      if (!response.ok) throw new Error(`Bridge Communication Error: ${response.statusText}`);
       const result = await response.json();
 
       if (result.status === 'success') {
@@ -189,6 +184,11 @@ export default function App() {
         setStatus({ type: 'success', msg: isEditMode ? '🎉 Update Complete! Your new certificate has been issued.' : '🎉 Enrollment Complete!' });
         setActiveStep(2);
       } else {
+        // --- STORAGE FULL DETECTION ---
+        if (result.message && (result.message.includes("0x80090023") || result.message.includes("STORAGE_FULL"))) {
+          addLog("CRITICAL ERROR: HSM Token Storage is full. No space for new keys.", "error");
+          addLog("HINT: Please manually delete old containers using 'certutil -delkey' or clear the token.", "warning");
+        }
         throw new Error(result.message || "Operation failed");
       }
     } catch (err) {
@@ -233,7 +233,7 @@ export default function App() {
                     label="Username (Common Name)" 
                     variant="outlined" fullWidth required
                     value={username} onChange={(e) => setUsername(e.target.value)}
-                    disabled={loading || isEditMode} // Locked in Edit Mode
+                    disabled={loading || isEditMode}
                     InputProps={{ startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} /> }}
                   />
                 </Grid>
@@ -311,7 +311,7 @@ export default function App() {
                 <Typography variant="h6">{username}</Typography>
                 <Typography variant="body2">{email}</Typography>
               </Card>
-              <Button variant="contained" size="large" onClick={() => navigate('/dashboard')} sx={{ mt: 3 }}>Return to Dashboard</Button>
+              <Button variant="contained" size="large" onClick={() => navigate('/admin-dashboard')} sx={{ mt: 3 }}>Return to Dashboard</Button>
             </Box>
           )}
 

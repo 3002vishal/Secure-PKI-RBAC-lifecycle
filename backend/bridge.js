@@ -17,77 +17,97 @@ const PORT = 8000;
 // ==========================================
 const MODIFY_ALL_SCRIPT = `
 param(
-    [Parameter(Mandatory=$true)] [string]$username,
-    [Parameter(Mandatory=$true)] [string]$serviceRoles, 
-    [Parameter(Mandatory=$true)] [string]$email,
-    [Parameter(Mandatory=$true)] [string]$orgUnit,
-    [Parameter(Mandatory=$true)] [string]$org,
-    [Parameter(Mandatory=$true)] [string]$state,
-    [Parameter(Mandatory=$true)] [string]$country
+    [string]$username, [string]$serviceRoles, [string]$email,
+    [string]$orgUnit, [string]$org, [string]$state, [string]$country
 )
 
 $serverUrl = "http://localhost:5000"
-// ESCAPED BACKTICKS BELOW
-$infFileName = "\$username\`_full_mod.inf"
-$csrFileName = "\$username\`_full_mod.req"
-$responseFileName = "\$username\`_full_mod.cer"
+$workDir = $env:TEMP
+$timestamp = Get-Date -Format "yyyyMMddHHmmss"
+$infFileName = Join-Path $workDir "$username-$timestamp.inf"
+$csrFileName = Join-Path $workDir "$username-$timestamp.req"
+$responseFileName = Join-Path $workDir "$username-$timestamp.cer"
+$logFile = Join-Path $env:TEMP "hsm-modify-debug.log"
 
-function Output-Json($status, $msg, $data = $null) {
-    $obj = @{ status = $status; message = $msg; data = $data }
-    Write-Output ($obj | ConvertTo-Json -Compress)
+function Log($msg) {
+    $ts = Get-Date -Format "HH:mm:ss"
+    "[$ts] $msg" | Out-File $logFile -Append
+    Write-Host "[LOG] $msg" 
 }
 
 try {
-    Write-Host "[MODIFY-ALL] 1. Creating INF with NEW identity details..." -ForegroundColor Cyan
+    # --- STEP 1: DELETE OLD CERTIFICATE ---
+    Log "Step 1: Searching for old certificates for $username..."
+    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My", "CurrentUser")
+    $store.Open("ReadWrite")
+    $oldCerts = $store.Certificates | Where-Object { $_.Subject -match "CN=$username" }
+    
+    foreach ($cert in $oldCerts) {
+        Log "Removing old certificate: $($cert.Thumbprint)"
+        $store.Remove($cert)
+    }
+    $store.Close()
+
+    # --- STEP 2: CREATE NEW INF ---
+    Log "Step 2: Creating INF with unique container: $username-$timestamp"
     $infContent = @"
 [NewRequest]
-Subject = "CN=\$username, E=\$email, OU=\$orgUnit, O=\$org, S=\$state, C=\$country"
+Subject = "CN=$username, E=$email, OU=$orgUnit, O=$org, S=$state, C=$country"
 KeyLength = 2048
 KeySpec = 2 
 MachineKeySet = FALSE
 RequestType = PKCS10
 ProviderName = "SafeSign Standard Cryptographic Service Provider"
 ProviderType = 1
-KeyContainer = "\$username"
+KeyContainer = "$username-$timestamp"
 [EnhancedKeyUsageExtension]
 OID=1.3.6.1.5.5.7.3.2 
 "@
+    $infContent | Out-File -FilePath $infFileName -Encoding ASCII -Force
 
-    $infContent | Out-File -FilePath $infFileName -Encoding ASCII
+    # --- STEP 3: GENERATE CSR ---
+    Log "Step 3: Generating new Keys & CSR..."
+    $certOutput = certreq -new -user -q $infFileName $csrFileName 2>&1
+    if (-not (Test-Path $csrFileName)) {
+        throw "CSR Generation Failed. Error: $certOutput"
+    }
+    $csrContent = [System.IO.File]::ReadAllText($csrFileName)
 
-    Write-Host "[MODIFY-ALL] 2. Generating New Keys & CSR..." -ForegroundColor Cyan
-    certreq -new -q $infFileName $csrFileName
-    $csrContent = [System.IO.File]::ReadAllText("\$PWD\\\\\$csrFileName")
-
-    Write-Host "[MODIFY-ALL] 3. Sending Full Update to Backend..." -ForegroundColor Cyan
+    # --- STEP 4: SEND TO BACKEND ---
+    Log "Step 4: Sending CSR to Backend for signing..."
     $payload = @{
-        username     = \$username
-        csr          = \$csrContent
-        serviceRoles = \$serviceRoles
-        email        = \$email
+        username     = $username
+        csr          = $csrContent
+        serviceRoles = $serviceRoles
+        email        = $email
     } | ConvertTo-Json
 
-    $response = Invoke-RestMethod -Uri "\$serverUrl/api/modify" -Method Post -Body \$payload -ContentType "application/json"
+    $response = Invoke-RestMethod -Uri "$serverUrl/api/modify" -Method Post -Body $payload -ContentType "application/json"
 
-    if (\$response.success) {
-        \$certContent = \$response.certificate
-        \$certContent | Out-File -FilePath \$responseFileName -Encoding ASCII
+    if ($response.success) {
+        # --- STEP 5: INSTALL NEW CERT ---
+        Log "Step 5: Saving and Accepting new certificate..."
+        $response.certificate | Out-File -FilePath $responseFileName -Encoding ASCII -Force
+        certreq -accept -user -q $responseFileName
 
-        Write-Host "[MODIFY-ALL] 4. Binding New Identity Cert to Token..." -ForegroundColor Cyan
-        certreq -accept -q \$responseFileName
+        # --- STEP 6: REPAIR KEY LINK ---
+        Log "Step 6: Repairing link to HSM..."
+        $tempCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($responseFileName)
+        $thumbprint = $tempCert.Thumbprint
+        certutil -user -silent -repairstore -csp "SafeSign Standard Cryptographic Service Provider" My $thumbprint
 
-        \$tempCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(\$responseFileName)
-        \$thumbprint = \$tempCert.Thumbprint
-        \$null = certutil -user -silent -repairstore -csp "SafeSign Standard Cryptographic Service Provider" My \$thumbprint
-
-        Remove-Item \$infFileName, \$csrFileName, \$responseFileName -ErrorAction SilentlyContinue
-        Output-Json "success" "Identity and Roles updated successfully" \$certContent
+        # Cleanup
+        Remove-Item $infFileName, $csrFileName, $responseFileName -ErrorAction SilentlyContinue
+        
+        Log "SUCCESS: Identity updated."
+        @{ status = "success"; message = "Identity updated and old certs removed"; data = $response.certificate } | ConvertTo-Json -Compress
     } else {
-        throw "Server Error: \$(\$response.error)"
+        throw "Backend Error: $($response.error)"
     }
 }
 catch {
-    Output-Json "error" \$_.Exception.Message
+    Log "CRITICAL ERROR: $($_.Exception.Message)"
+    @{ status = "error"; message = $_.Exception.Message } | ConvertTo-Json -Compress
     exit 1
 }
 `;
@@ -120,6 +140,8 @@ try {
 
     # We explicitly name the container as the username. 
     # We will rely on this specific name in the Login script if the link breaks.
+    $timestamp = Get-Date -Format "yyyyMMddHHmss"
+    $uniqueContainer = "$username-$timestamp"
     $infContent = @"
 [NewRequest]
 Subject = "CN=$username, E=$email, OU=$orgUnit, O=$org, S=$state, C=$country"
@@ -132,7 +154,7 @@ RequestType = PKCS10
 SMIME = FALSE
 ProviderName = "SafeSign Standard Cryptographic Service Provider"
 ProviderType = 1
-KeyContainer = "$username"
+KeyContainer = "$uniqueContainer"
 [EnhancedKeyUsageExtension]
 OID=1.3.6.1.5.5.7.3.2 
 "@
@@ -410,16 +432,11 @@ app.post('/signup', (req, res) => {
 app.post('/modify', (req, res) => {
     const { username, serviceRoles, email, orgUnit, org, state, country } = req.body;
 
-    // Check for all required fields
-    if (!username || !serviceRoles || !email || !orgUnit || !org || !state || !country) {
-        return res.status(400).json({ status: "error", message: "Missing required identity fields." });
-    }
-
-    console.log(`[MODIFY] Full Identity Update for ${username}...`);
+    console.log(`\n--- [MODIFY REQUEST] User: ${username} ---`);
 
     try {
-        const scriptPath = getScriptPath('modify.ps1'); // Ensure this points to the MODIFY_ALL_SCRIPT
-        const serviceRolesString = typeof serviceRoles === 'string' ? serviceRoles : JSON.stringify(serviceRoles);
+        const scriptPath = getScriptPath('modify.ps1');
+        const serviceRolesString = JSON.stringify(serviceRoles);
 
         const ps = spawn('powershell.exe', [
             '-NoProfile', '-ExecutionPolicy', 'Bypass', 
@@ -434,17 +451,43 @@ app.post('/modify', (req, res) => {
         ]);
 
         let scriptOutput = "";
-        ps.stdout.on('data', (data) => { scriptOutput += data.toString(); });
-        ps.stderr.on('data', (data) => { console.error(data.toString()); });
+        let errorOutput = "";
+
+        ps.stdout.on('data', (data) => {
+            const out = data.toString();
+            console.log(`[PS-STDOUT]: ${out}`);
+            scriptOutput += out;
+        });
+
+        ps.stderr.on('data', (data) => {
+            const err = data.toString();
+            console.error(`[PS-STDERR]: ${err}`); // This captures system-level PS errors
+            errorOutput += err;
+        });
 
         ps.on('close', (code) => {
+            console.log(`[PROCESS CLOSE] Code: ${code}`);
+            
             try {
                 const jsonStartIndex = scriptOutput.indexOf('{');
-                if (jsonStartIndex === -1) throw new Error("No JSON found in output");
+                if (jsonStartIndex === -1) {
+                    return res.status(500).json({ 
+                        status: "error", 
+                        message: "No JSON response from script", 
+                        rawOutput: scriptOutput,
+                        systemError: errorOutput 
+                    });
+                }
+
                 const parsedResult = JSON.parse(scriptOutput.substring(jsonStartIndex));
                 res.status(parsedResult.status === 'error' ? 500 : 200).json(parsedResult);
             } catch (e) {
-                res.status(500).json({ status: "error", message: "Bridge parse failure", details: scriptOutput });
+                res.status(500).json({ 
+                    status: "error", 
+                    message: "Bridge parse failure", 
+                    details: scriptOutput,
+                    error: e.message 
+                });
             }
         });
     } catch (e) {
