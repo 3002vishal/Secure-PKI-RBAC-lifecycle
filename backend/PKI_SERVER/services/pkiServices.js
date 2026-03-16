@@ -1,7 +1,8 @@
 const forge = require("node-forge");
 const fs = require("fs");
 const { execSync } = require("child_process");
-const { ROOT_CA_PEM, INT_CA_PEM, CRL_PATH } = require("../config/certConfig");
+const { ROOT_CA_PEM, INT_CA_PEM, CRL_PATH , CERT_DIR} = require("../config/certConfig");
+const path  = require('path');
 
 function isCertificateRevoked(certPem) {
   try {
@@ -85,4 +86,60 @@ function verifyCertificateChain(certPem) {
         });
 };
 
-module.exports = { isCertificateRevoked , verifyCertificateChain ,getUserDetails};
+
+function  getFullUserDetails(username) {
+    try {
+        const certPath = path.join(CERT_DIR, `${username}_cert.pem`);
+        console.log(certPath);
+        if (!fs.existsSync(certPath)) return null;
+
+        const certPem = fs.readFileSync(certPath, "utf8");
+        const cert = forge.pki.certificateFromPem(certPem);
+
+        // 1. Helper to get Subject fields by ShortName
+        const getSubjectField = (shortName) => {
+            const field = cert.subject.getField(shortName);
+            return field ? field.value : "";
+        };
+
+        // 2. Extract Identity Details
+        const details = {
+            username: username, // CN
+            email: getSubjectField('E') || getSubjectField('emailAddress'),
+            orgUnit: getSubjectField('OU'),
+            org: getSubjectField('O'),
+            state: getSubjectField('ST'),
+            country: getSubjectField('C') || "IN",
+            serviceRoles: {} // Default empty
+        };
+
+        // 3. Extract Custom Extension (Roles)
+        // Note: Using your specific OID 1.2.3.4.5.6.7.8.1
+        const roleExt = cert.extensions.find((ext) => ext.id === "1.2.3.4.5.6.7.8.1");
+        
+        if (roleExt && roleExt.value) {
+            // Forge encodes the value in ASN.1. 
+            // We use your regex to find the JSON structure inside the raw data.
+            const raw = roleExt.value.toString("utf8");
+            const jsonMatch = raw.match(/\{.*\}/);
+            
+            if (jsonMatch) {
+                try {
+                    details.serviceRoles = JSON.parse(jsonMatch[0]);
+                } catch (e) {
+                    console.error("Failed to parse roles JSON from cert");
+                }
+            }
+        }
+
+        return details;
+    } catch (err) {
+        console.error("Extraction Error:", err);
+        return null;
+    }
+};
+
+console.log(getFullUserDetails("user6"));
+
+
+module.exports = { isCertificateRevoked , verifyCertificateChain ,getUserDetails, getFullUserDetails};

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Container, 
   Paper, 
@@ -12,19 +13,17 @@ import {
   Box, 
   Alert, 
   CircularProgress,
-  Divider,
-  Grid,
-  Chip,
-  Collapse,
-  IconButton,
-  Stepper,
-  Step,
-  StepLabel,
-  Card,
-  CardContent
+  Divider, 
+  Grid, 
+  Chip, 
+  Collapse, 
+  IconButton, 
+  Stepper, 
+  Step, 
+  StepLabel, 
+  Card, 
+  CardContent 
 } from '@mui/material';
-// Icons not used since we removed the download step
-// import DownloadIcon from '@mui/icons-material/Download';
 import SecurityIcon from '@mui/icons-material/Security';
 import PersonIcon from '@mui/icons-material/Person';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
@@ -33,9 +32,6 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import LockIcon from '@mui/icons-material/Lock';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-// Icons not used since we removed the download step
-// import LoginIcon from '@mui/icons-material/Login';
-
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -64,32 +60,48 @@ const getRoleColor = (roleName) => {
 };
 
 export default function App() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [orgUnit, setOrgUnit] = useState('');
-  const [org, setOrg] = useState('');
-  const [state, setState] = useState('');
-  const [country, setCountry] = useState('IN');
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const editUser = location.state?.editUser; 
+  const isEditMode = !!editUser;
 
-  const [serviceRoles, setServiceRoles] = useState({
-    "Zero Trust Gateway": "NA",
-    "PKI Management": "NA",
-    "HSM Operation": "NA",
-    "IAM": "NA",
-    "Security Analytics": "NA",
-    "Crypto Vault": "NA"
+  const [activeStep, setActiveStep] = useState(0);
+  const [username, setUsername] = useState(editUser?.username || '');
+  const [email, setEmail] = useState(editUser?.email || '');
+  const [orgUnit, setOrgUnit] = useState(editUser?.orgUnit || '');
+  const [org, setOrg] = useState(editUser?.org || '');
+  const [state, setState] = useState(editUser?.state || '');
+  const [country, setCountry] = useState(editUser?.country || 'IN');
+
+  const [serviceRoles, setServiceRoles] = useState(() => {
+    if (editUser?.serviceRoles) {
+      return typeof editUser.serviceRoles === 'string' 
+        ? JSON.parse(editUser.serviceRoles) 
+        : editUser.serviceRoles;
+    }
+    return {
+      "Zero Trust Gateway": "NA",
+      "PKI Management": "NA",
+      "HSM Operation": "NA",
+      "IAM": "NA",
+      "Security Analytics": "NA",
+      "Crypto Vault": "NA"
+    };
   });
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
   
   const [logs, setLogs] = useState([
-    { message: "System initialized. Ready for secure enrollment...", type: "info", timestamp: new Date().toLocaleTimeString() }
+    { 
+      message: isEditMode ? `Identity detected for [${editUser.username}]. Entering modification mode.` : "System initialized. Ready for secure enrollment...", 
+      type: isEditMode ? "warning" : "info", 
+      timestamp: new Date().toLocaleTimeString() 
+    }
   ]);
   
   const [showLogs, setShowLogs] = useState(true);
-  
   const logContainerRef = useRef(null);
 
   useEffect(() => {
@@ -98,6 +110,10 @@ export default function App() {
       logContainerRef.current.scrollTop = scrollHeight - clientHeight;
     }
   }, [logs]);
+
+  useEffect(() => {
+    if (isEditMode) setActiveStep(1);
+  }, [isEditMode]);
 
   const addLog = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -115,10 +131,7 @@ export default function App() {
   };
 
   const handleRoleChange = (service, newRole) => {
-    setServiceRoles(prev => ({
-      ...prev,
-      [service]: newRole
-    }));
+    setServiceRoles(prev => ({ ...prev, [service]: newRole }));
     addLog(`Updated ${service} role to: ${newRole}`, "info");
   };
 
@@ -135,10 +148,7 @@ export default function App() {
   };
 
   const handleNext = () => {
-    // Current activeStep 0 is 'Personal Details'
-    if (activeStep === 0 && !validatePersonalInfo()) {
-      return;
-    }
+    if (activeStep === 0 && !validatePersonalInfo()) return;
     setStatus({ type: '', msg: '' });
     setActiveStep(prev => prev + 1);
   };
@@ -152,88 +162,62 @@ export default function App() {
     if (!validatePersonalInfo()) return;
 
     setLoading(true);
-    setStatus({ type: 'info', msg: 'Initiating secure hardware enrollment...' });
+    const endpoint = isEditMode ? 'http://localhost:8000/modify' : 'http://localhost:8000/signup';
+    setStatus({ type: 'info', msg: isEditMode ? 'Rotating keys and updating certificate...' : 'Initiating secure hardware enrollment...' });
     
-    addLog(`Starting enrollment for user: ${username}`, "process");
-    addLog(`Identity Data: ${email} | ${org}`, "info");
+    addLog(`${isEditMode ? 'Modifying' : 'Starting enrollment for'} user: ${username}`, "process");
 
     try {
-      addLog("Connecting to Local HSM Bridge (localhost:8000)...", "process");
+      addLog(`Connecting to HSM Bridge (${endpoint})...`, "process");
       addLog(`Encoding Access Matrix: ${JSON.stringify(serviceRoles)}`, "info");
 
-      const response = await fetch('http://localhost:8000/signup', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            username, 
-            serviceRoles,
-            email, 
-            orgUnit, 
-            org, 
-            state, 
-            country 
-        })
+        body: JSON.stringify({ username, serviceRoles, email, orgUnit, org, state, country })
       });
-
-      if (!response.ok) {
-        throw new Error(`Bridge Communication Error: ${response.statusText}`);
-      }
 
       const result = await response.json();
 
       if (result.status === 'success') {
-        addLog("Hardware token provisioned successfully", "success");
-        addLog("Digital certificate installed to secure storage", "success");
-        setStatus({ type: 'success', msg: '🎉 Enrollment Complete! Your identity is now secured by hardware.' });
-        // Correcting final step index (Step 2 is complete)
+        addLog(isEditMode ? "Certificate rotated and re-issued" : "Hardware token provisioned successfully", "success");
+        setStatus({ type: 'success', msg: isEditMode ? '🎉 Update Complete! Your new certificate has been issued.' : '🎉 Enrollment Complete!' });
         setActiveStep(2);
       } else {
-        throw new Error(result.message || "Unknown enrollment error");
+        // --- STORAGE FULL DETECTION ---
+        if (result.message && (result.message.includes("0x80090023") || result.message.includes("STORAGE_FULL"))) {
+          addLog("CRITICAL ERROR: HSM Token Storage is full. No space for new keys.", "error");
+          addLog("HINT: Please manually delete old containers using 'certutil -delkey' or clear the token.", "warning");
+        }
+        throw new Error(result.message || "Operation failed");
       }
-
     } catch (err) {
-      console.error(err);
-      setStatus({ type: 'error', msg: '❌ Enrollment Failed - Please check logs' });
-      addLog(`Enrollment Error: ${err.message}`, "error");
-
-      if (err.message.includes("Failed to fetch")) {
-        addLog("HINT: HSM Bridge service is not running. Please start it and retry.", "warning");
-      }
+      setStatus({ type: 'error', msg: `❌ ${isEditMode ? 'Update' : 'Enrollment'} Failed - Please check logs` });
+      addLog(`Error: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Steps updated
-  const steps = ['Personal Details', 'Access Privileges', 'Complete'];
+  const steps = isEditMode ? ['Verify Identity', 'Modify Privileges', 'Complete'] : ['Personal Details', 'Access Privileges', 'Complete'];
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      py: 4 
-    }}>
+    <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', py: 4 }}>
       <Container maxWidth="lg">
         <Box sx={{ textAlign: 'center', mb: 4, color: 'white' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-            <LockIcon sx={{ fontSize: 48, mr: 2 }} />
+            {isEditMode ? <AdminPanelSettingsIcon sx={{ fontSize: 48, mr: 2 }} /> : <LockIcon sx={{ fontSize: 48, mr: 2 }} />}
             <Typography variant="h3" fontWeight="bold">
-              Enrollment Portal
+              {isEditMode ? "Identity Modification" : "Enrollment Portal"}
             </Typography>
           </Box>
-          <Chip 
-            icon={<SecurityIcon />} 
-            label="PKI + HSM Protected" 
-            sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
-          />
+          <Chip icon={<SecurityIcon />} label="PKI + HSM Protected" sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }} />
         </Box>
 
         <Paper elevation={6} sx={{ p: 4, borderRadius: 3 }}>
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
             {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
+              <Step key={label}><StepLabel>{label}</StepLabel></Step>
             ))}
           </Stepper>
 
@@ -247,84 +231,28 @@ export default function App() {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     label="Username (Common Name)" 
-                    placeholder="e.g., john.doe"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={username} 
-                    onChange={(e) => setUsername(e.target.value)}
-                    disabled={loading}
-                    InputProps={{
-                      startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} />
-                    }}
+                    variant="outlined" fullWidth required
+                    value={username} onChange={(e) => setUsername(e.target.value)}
+                    disabled={loading || isEditMode}
+                    InputProps={{ startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} /> }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Email Address" 
-                    placeholder="user@organization.com"
-                    type="email"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                  />
+                  <TextField label="Email Address" type="email" variant="outlined" fullWidth required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Organizational Unit" 
-                    placeholder="e.g., IT Security"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={orgUnit} 
-                    onChange={(e) => setOrgUnit(e.target.value)}
-                    disabled={loading}
-                  />
+                  <TextField label="Organizational Unit" variant="outlined" fullWidth required value={orgUnit} onChange={(e) => setOrgUnit(e.target.value)} disabled={loading} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Organization" 
-                    placeholder="e.g., Acme Corporation"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={org} 
-                    onChange={(e) => setOrg(e.target.value)}
-                    disabled={loading}
-                  />
+                  <TextField label="Organization" variant="outlined" fullWidth required value={org} onChange={(e) => setOrg(e.target.value)} disabled={loading} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="State/Province" 
-                    placeholder="e.g., Karnataka"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={state} 
-                    onChange={(e) => setState(e.target.value)}
-                    disabled={loading}
-                  />
+                  <TextField label="State/Province" variant="outlined" fullWidth required value={state} onChange={(e) => setState(e.target.value)} disabled={loading} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Country Code" 
-                    placeholder="e.g., IN"
-                    variant="outlined" 
-                    fullWidth 
-                    required
-                    value={country} 
-                    onChange={(e) => setCountry(e.target.value.toUpperCase())}
-                    disabled={loading}
-                    helperText="Two-letter ISO code (e.g., IN, US, UK)"
-                  />
+                  <TextField label="Country Code" variant="outlined" fullWidth required value={country} onChange={(e) => setCountry(e.target.value.toUpperCase())} disabled={loading} />
                 </Grid>
               </Grid>
-              <Alert severity="info" sx={{ mt: 3 }}>
-                This information will be embedded in your cryptographic certificate and cannot be changed later.
-              </Alert>
             </Box>
           )}
 
@@ -334,10 +262,6 @@ export default function App() {
                 <AdminPanelSettingsIcon sx={{ mr: 1, color: '#1976d2' }} />
                 Service Access Matrix
               </Typography>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Define role-based access for each security service. These permissions will be cryptographically bound to your hardware token.
-              </Typography>
-              
               <Grid container spacing={2}>
                 {SERVICES.map((serviceName) => {
                   const specificRoles = SERVICE_CONFIG[serviceName];
@@ -347,9 +271,7 @@ export default function App() {
                         <CardContent>
                           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                             <VpnKeyIcon sx={{ mr: 1, color: '#1976d2' }} />
-                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                                {serviceName}
-                            </Typography>
+                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>{serviceName}</Typography>
                           </Box>
                           <FormControl fullWidth>
                             <InputLabel>Access Role</InputLabel>
@@ -362,12 +284,7 @@ export default function App() {
                               {specificRoles.map(r => (
                                 <MenuItem key={r} value={r}>
                                   <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                                    <Box 
-                                      sx={{ 
-                                        width: 12, height: 12, borderRadius: '50%', 
-                                        bgcolor: getRoleColor(r), mr: 1 
-                                      }} 
-                                    />
+                                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: getRoleColor(r), mr: 1 }} />
                                     {r}
                                   </Box>
                                 </MenuItem>
@@ -375,14 +292,7 @@ export default function App() {
                             </Select>
                           </FormControl>
                           <Box sx={{ mt: 1 }}>
-                            <Chip 
-                              size="small" 
-                              label={serviceRoles[serviceName]}
-                              sx={{ 
-                                bgcolor: getRoleColor(serviceRoles[serviceName]),
-                                color: 'white', fontWeight: 'bold', fontSize: '0.75rem'
-                              }}
-                            />
+                            <Chip size="small" label={serviceRoles[serviceName]} sx={{ bgcolor: getRoleColor(serviceRoles[serviceName]), color: 'white', fontWeight: 'bold' }} />
                           </Box>
                         </CardContent>
                       </Card>
@@ -390,143 +300,52 @@ export default function App() {
                   );
                 })}
               </Grid>
-              <Alert severity="warning" sx={{ mt: 3 }}>
-                <strong>Security Notice:</strong> These access privileges will be permanently encoded in your certificate. 
-              </Alert>
             </Box>
           )}
 
           {activeStep === 2 && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CheckCircleIcon sx={{ fontSize: 100, color: '#4caf50', mb: 2 }} />
-              <Typography variant="h4" gutterBottom fontWeight="bold" color="success.main">
-                Enrollment Successful!
-              </Typography>
-              <Typography variant="body1" color="textSecondary" paragraph>
-                Your identity has been securely provisioned and is now protected by hardware-backed cryptography.
-              </Typography>
+              <Typography variant="h4" gutterBottom fontWeight="bold" color="success.main">{isEditMode ? 'Update Successful!' : 'Enrollment Successful!'}</Typography>
               <Card variant="outlined" sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5' }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                  Enrolled Identity
-                </Typography>
                 <Typography variant="h6">{username}</Typography>
                 <Typography variant="body2">{email}</Typography>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" color="textSecondary">
-                  Organization: {org} ({orgUnit})
-                </Typography>
               </Card>
-              <Button 
-                variant="contained" 
-                size="large" 
-                href="/"
-                sx={{ mt: 3 }}
-              >
-                Proceed to Login
-              </Button>
+              <Button variant="contained" size="large" onClick={() => navigate('/admin-dashboard')} sx={{ mt: 3 }}>Return to Dashboard</Button>
             </Box>
           )}
 
-          {status.msg && activeStep !== 2 && (
-            <Alert severity={status.type} sx={{ mt: 3 }}>
-              {status.msg}
-            </Alert>
-          )}
+          {status.msg && activeStep !== 2 && <Alert severity={status.type} sx={{ mt: 3 }}>{status.msg}</Alert>}
 
           {activeStep < 2 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-              <Button
-                disabled={activeStep === 0 || loading}
-                onClick={handleBack}
-                size="large"
-              >
-                Back
-              </Button>
-              <Box sx={{ flex: 1 }} />
+              <Button disabled={activeStep === 0 || loading} onClick={handleBack} size="large">Back</Button>
               {activeStep === 1 ? (
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleEnrollment}
-                  disabled={loading}
-                  startIcon={loading ? <CircularProgress size={20} /> : <SecurityIcon />}
-                  sx={{ 
-                    minWidth: 200,
-                    background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
-                    boxShadow: '0 3px 5px 2px rgba(255, 105, 135, .3)',
-                  }}
-                >
-                  {loading ? 'Enrolling...' : 'Complete Enrollment'}
+                <Button variant="contained" size="large" onClick={handleEnrollment} disabled={loading} sx={{ minWidth: 200, background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)' }}>
+                  {loading ? 'Processing...' : (isEditMode ? 'Modify Certificate' : 'Complete Enrollment')}
                 </Button>
               ) : (
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleNext}
-                  sx={{ minWidth: 120 }}
-                >
-                  Next
-                </Button>
+                <Button variant="contained" size="large" onClick={handleNext} sx={{ minWidth: 120 }}>Next</Button>
               )}
             </Box>
           )}
 
-          {/* Corrected log condition to show from start */}
           {activeStep >= 0 && (
             <Box sx={{ mt: 4 }}>
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  mb: 1
-                }}
-                onClick={() => setShowLogs(!showLogs)}
-              >
-                <Typography variant="subtitle2" color="textSecondary">
-                  🔍 LIVE SECURITY LOGS
-                </Typography>
-                <IconButton size="small">
-                  {showLogs ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', mb: 1 }} onClick={() => setShowLogs(!showLogs)}>
+                <Typography variant="subtitle2" color="textSecondary">🔍 LIVE SECURITY LOGS</Typography>
+                <IconButton size="small">{showLogs ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>
               </Box>
               <Collapse in={showLogs}>
-                <Box 
-                  ref={logContainerRef}
-                  sx={{ 
-                    bgcolor: '#1e1e1e', 
-                    borderRadius: 2, 
-                    maxHeight: 250, 
-                    overflowY: 'auto', 
-                    border: '1px solid #333',
-                    p: 1
-                  }}
-                >
+                <Box ref={logContainerRef} sx={{ bgcolor: '#1e1e1e', borderRadius: 2, maxHeight: 250, overflowY: 'auto', border: '1px solid #333', p: 1 }}>
                   {logs.map((log, index) => {
                     const style = getLogStyle(log.type);
                     return (
-                      <Box 
-                        key={index} 
-                        sx={{ 
-                          display: 'flex', 
-                          alignItems: 'start', 
-                          mb: 1, 
-                          p: 1, 
-                          borderRadius: 1,
-                          bgcolor: 'rgba(255,255,255,0.03)' 
-                        }}
-                      >
-                        <Box sx={{ color: style.color, mr: 1.5, mt: 0.5 }}>
-                          {style.icon}
-                        </Box>
+                      <Box key={index} sx={{ display: 'flex', alignItems: 'start', mb: 1, p: 1, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                        <Box sx={{ color: style.color, mr: 1.5, mt: 0.5 }}>{style.icon}</Box>
                         <Box>
-                          <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 0.5 }}>
-                            {log.timestamp}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#eee', fontFamily: 'monospace' }}>
-                            {log.message}
-                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 0.5 }}>{log.timestamp}</Typography>
+                          <Typography variant="body2" sx={{ color: '#eee', fontFamily: 'monospace' }}>{log.message}</Typography>
                         </Box>
                       </Box>
                     );
@@ -536,12 +355,6 @@ export default function App() {
             </Box>
           )}
         </Paper>
-
-        <Box sx={{ textAlign: 'center', mt: 3, color: 'white', opacity: 0.8 }}>
-          <Typography variant="caption">
-            🔒 Secured by Hardware Security Module (HSM) • Zero Trust Architecture • PKI Infrastructure
-          </Typography>
-        </Box>
       </Container>
     </Box>
   );
