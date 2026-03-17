@@ -6,19 +6,19 @@ R	270306075127Z	260306075255Z	1004	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=
 R	270306082308Z	260306082624Z	1005	unknown	/C=IN/ST=Karnataka/O=CDAC/OU=Rise/CN=Harsh/emailAddress=harsh@gmail.com
 R	270307051410Z	260310053033Z	1006	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user3/emailAddress=user3@gamil.com
 V	270307053000Z		1007	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=rahul/emailAddress=rahul@gmail.com
-V	270311034156Z		1008	unknown	/CN=hundred
+R	270311034156Z	260317081323Z,CACompromise	1008	unknown	/CN=hundred
 R	270311061618Z	260311063450Z	1009	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user4/emailAddress=user4@gmail.com
-V	270311061800Z		100A	unknown	/C=IN/ST=karnataka/O=cdac/OU=ries/CN=user5/emailAddress=user5@gmail.com
-V	270311061912Z		100B	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user6/emailAddress=user6@gmail.com
-V	270311062057Z		100C	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user7/emailAddress=user7@gamil.com
-V	270311063450Z		100D	unknown	/C=IN/ST=Karnataka/O=ZeroTrust Corp/OU=Security Operations/CN=user4/emailAddress=user4.updated@company.com
-V	270312092225Z		100E	unknown	/C=IN/ST=Jharkhand/O=None/OU=None/CN=user8/emailAddress=user8@gmail.com
-V	270312093723Z		100F	unknown	/C=IN/ST=karnantaka/O=cdac/OU=rise/CN=user9/emailAddress=user9@gmail.com
+R	270311061800Z	260317080209Z,superseded	100A	unknown	/C=IN/ST=karnataka/O=cdac/OU=ries/CN=user5/emailAddress=user5@gmail.com
+R	270311061912Z	260317081235Z,affiliationChanged	100B	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user6/emailAddress=user6@gmail.com
+R	270311062057Z	260317080146Z,unspecified	100C	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user7/emailAddress=user7@gamil.com
+R	270311063450Z	260317080159Z,cessationOfOperation	100D	unknown	/C=IN/ST=Karnataka/O=ZeroTrust Corp/OU=Security Operations/CN=user4/emailAddress=user4.updated@company.com
+R	270312092225Z	260317080055Z,unspecified	100E	unknown	/C=IN/ST=Jharkhand/O=None/OU=None/CN=user8/emailAddress=user8@gmail.com
+R	270312093723Z	260317080029Z,unspecified	100F	unknown	/C=IN/ST=karnantaka/O=cdac/OU=rise/CN=user9/emailAddress=user9@gmail.com
 R	270312093953Z	260313041644Z	1010	unknown	/C=IN/ST=karnantaka/O=cdac/OU=rise/CN=user10/emailAddress=user9@gmail.com
 V	270312094531Z		1011	unknown	/C=IN/ST=karnantaka/O=cdac/OU=rise/CN=user11/emailAddress=user9@gmail.com
 R	270313041644Z	260317043602Z	1012	unknown	/C=IN/ST=karnantaka/O=cdac/OU=rise/CN=user10/emailAddress=user9@gmail.com
 R	270313044442Z	260317043517Z	1013	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user11/emailAddress=user11@gmail.com
-V	270313044635Z		1014	unknown	/C=IN/ST=Bihar/O=cdac/OU=rise/CN=user12/emailAddress=2003.v.vishal@gmail.com
+R	270313044635Z	260317075937Z,keyCompromise	1014	unknown	/C=IN/ST=Bihar/O=cdac/OU=rise/CN=user12/emailAddress=2003.v.vishal@gmail.com
 R	270313045250Z	260317064233Z,keyCompromise	1015	unknown	/C=IN/ST=Bihar/O=None/OU=9/CN=user13/emailAddress=2003.v.vishal@gmail.com
 R	270313054259Z	260317063859Z	1016	unknown	/C=IN/ST=karnatka/O=cdac/OU=rise/CN=user14/emailAddress=user14@gmail.com
 R	270313054533Z	260317043621Z	1017	unknown	/C=IN/ST=Bihar/O=None/OU=None/CN=user15/emailAddress=2003.v.vishal@gmail.com
@@ -29,3 +29,4 @@ R	270316060555Z	260316060647Z	101B	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=
 R	270316060647Z	260317044555Z	101C	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user19/emailAddress=user19@gmail.com
 R	270316061415Z	260317062534Z	101D	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user18/emailAddress=user18@gmail.com
 R	270316084301Z	260317042347Z	101E	unknown	/C=IN/ST=Karnataka/O=CDAC/OU=Rise/CN=user17/emailAddress=user17@gmail.com
+R	270317082147Z	260317082222Z,superseded	101F	unknown	/C=IN/ST=Bihar/O=cdac/OU=rise/CN=user12/emailAddress=2003.v.vishal@gmail.com
