@@ -69,76 +69,69 @@ exports.enroll = (req, res) => {
     });
 };
 
-
-
 exports.revoke = (req, res) => {
-    const { username } = req.body;
+    // 1. Get username and reason from request
+    const { username, reason } = req.body; 
+    
+    // Set a default if no reason is provided
+    const revocationReason = reason || "unspecified"; 
 
-    // console.log(username);
-    // 1. Get the path to the original user cert to find its serial
     const userCertPath = path.join(CERT_DIR, `${username}_cert.pem`);
 
     if (!fs.existsSync(userCertPath)) {
-        return res.status(404).json({ error: "Certificate not found in main directory." });
+        return res.status(404).json({ error: "Certificate not found." });
     }
 
     try {
-        // 2. Calculate Serial Number using node-forge
         const certPem = fs.readFileSync(userCertPath, 'utf8');
         const cert = forge.pki.certificateFromPem(certPem);
-        const serialHex = cert.serialNumber.toLowerCase(); // OpenSSL usually saves as lowercase hex (e.g. 1009)
+        const serialHex = cert.serialNumber.toLowerCase();
         
-        // 3. Point to the "Archive" location inside your demoCA structure
-        // Note: Using the exact spelling 'newCErts' from your earlier message
         const archiveCertPath = path.join(BACKEND_ROOT, "demoCA", "intermediate", "newCErts", `${serialHex.toUpperCase()}.pem`);
-
-        console.log(`[REVOKE] Calculated Serial: ${serialHex}`);
-        console.log(`[REVOKE] Looking for archive file: ${archiveCertPath}`);
-
-        // Check if the archive file actually exists before calling OpenSSL
-        if (!fs.existsSync(archiveCertPath)) {
-            console.warn("[WARN] Archive cert not found, falling back to user cert path.");
-        }
-        
-        // Use the archive path if it exists, otherwise fall back to the user cert path
         const finalRevokePath = fs.existsSync(archiveCertPath) ? archiveCertPath : userCertPath;
 
-        // 4. Run OpenSSL Revoke
+        // 2. Updated Revoke Args with -crl_reason
         const revokeArgs = [
             "ca", "-config", OPENSSL_DIR, 
             "-name", "intermediate_ca", 
-            "-revoke", finalRevokePath
+            "-revoke", finalRevokePath,
+            "-crl_reason", revocationReason // <--- ADD THIS LINE
         ];
 
         const revProcess = spawn("openssl", revokeArgs, { 
-    cwd: BACKEND_ROOT,
-    // ADD THIS ENV OBJECT:
-    env: { 
-        ...process.env, 
-        SERVICE_ROLES: "revocation_mode" // Provide a placeholder value
-    } 
-});
+            cwd: BACKEND_ROOT,
+            env: { ...process.env, SERVICE_ROLES: "revocation_mode" } 
+        });
 
-        let stderr = "";
-        revProcess.stderr.on("data", (data) => { stderr += data.toString(); });
+        let revokeStderr = "";
+        revProcess.stderr.on("data", (data) => { revokeStderr += data.toString(); });
 
         revProcess.on("close", (code) => {
             if (code !== 0) {
-                return res.status(500).json({ error: "Revocation failed", details: stderr });
+                return res.status(500).json({ error: "Revocation failed", details: revokeStderr });
             }
 
-            // 5. Always update the CRL after a successful revocation
+            // 3. Generate CRL (Same as before)
             const crlArgs = ["ca", "-config", OPENSSL_DIR, "-name", "intermediate_ca", "-gencrl", "-out", CRL_PATH];
-            spawn("openssl", crlArgs, { cwd: BACKEND_ROOT }).on("close", (crlCode) => {
-                res.json({ success: true, message: `Revoked serial ${serialHex} and updated CRL.` });
+            const crlProcess = spawn("openssl", crlArgs, { 
+                cwd: BACKEND_ROOT,
+                env: { ...process.env, SERVICE_ROLES: "revocation_mode" } 
+            });
+
+            crlProcess.on("close", (crlCode) => {
+                res.json({ 
+                    success: true, 
+                    message: `Revoked ${username} (Serial: ${serialHex}) for reason: ${revocationReason}` 
+                });
             });
         });
 
     } catch (err) {
-        console.error("Revocation Error:", err);
-        res.status(500).json({ error: "Internal processing error", details: err.message });
+        res.status(500).json({ error: "Internal error", details: err.message });
     }
 };
+
+
 
 exports.verify = (req, res) => {
     const { username } = req.body;
