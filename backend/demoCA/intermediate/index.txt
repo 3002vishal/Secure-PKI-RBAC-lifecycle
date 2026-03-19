@@ -30,3 +30,7 @@ R	270316060647Z	260317044555Z	101C	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=
 R	270316061415Z	260317062534Z	101D	unknown	/C=IN/ST=karnataka/O=cdac/OU=rise/CN=user18/emailAddress=user18@gmail.com
 R	270316084301Z	260317042347Z	101E	unknown	/C=IN/ST=Karnataka/O=CDAC/OU=Rise/CN=user17/emailAddress=user17@gmail.com
 R	270317082147Z	260317082222Z,superseded	101F	unknown	/C=IN/ST=Bihar/O=cdac/OU=rise/CN=user12/emailAddress=2003.v.vishal@gmail.com
+R	270318042042Z	260318042451Z,CACompromise	1020	unknown	/C=IN/ST=Karnataka/O=cdac/OU=rise/CN=user20/emailAddress=user20@gmail.com
+R	270318042612Z	260318044030Z	1021	unknown	/C=IN/ST=Karnataka/O=cdac/OU=rise/CN=user20/emailAddress=user20@gmail.com
+R	270318044030Z	260319041404Z,affiliationChanged	1022	unknown	/C=IN/ST=Karnataka/O=cdac/OU=rise/CN=user20/emailAddress=user20@gmail.com
+V	270319041209Z		1023	unknown	/C=IN/ST=karntaka/O=cdac/OU=rise/CN=user21/emailAddress=user21@gamil.com
