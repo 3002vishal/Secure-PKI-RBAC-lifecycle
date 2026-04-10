@@ -3,21 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Container, Typography, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, Chip, IconButton, 
-  Tooltip, Box, CircularProgress, TextField, MenuItem, Select, FormControl, InputLabel
+  Tooltip, Box, CircularProgress, TextField, MenuItem, Select, 
+  FormControl, Divider, Dialog, DialogTitle, 
+  DialogContent, DialogActions, Alert
 } from '@mui/material';
 import { 
-  DeleteForever as RevokeIcon, 
+  GppBad as RevokeIcon, 
   PersonAdd as EnrollIcon,
   Refresh as ReissueIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Shield as ShieldIcon,
+  Fingerprint as SerialIcon
 } from '@mui/icons-material';
+
+const REVOCATION_REASONS = [
+  { value: 'unspecified', label: 'Unspecified' },
+  { value: 'keyCompromise', label: 'Key Compromise' },
+  { value: 'CACompromise', label: 'CA Compromise' },
+  { value: 'affiliationChanged', label: 'Affiliation Changed' },
+  { value: 'superseded', label: 'Superseded' },
+  { value: 'cessationOfOperation', label: 'Cessation of Operation' }
+];
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [fetchingUser, setFetchingUser] = useState(null); // Local loading for reissue
+  const [fetchingUser, setFetchingUser] = useState(null);
+  const [revocationReasons, setRevocationReasons] = useState({});
+  
+  // Security Modal State
+  const [revokeModal, setRevokeModal] = useState({ open: false, user: null });
+
   const navigate = useNavigate();
 
   const fetchUsers = async () => {
@@ -29,7 +47,7 @@ const AdminDashboard = () => {
         setUsers(data.userdetail);
       }
     } catch (err) {
-      console.error("Error fetching user details:", err);
+      console.error("Connection Error:", err);
     } finally {
       setLoading(false);
     }
@@ -42,50 +60,55 @@ const AdminDashboard = () => {
     const year = `20${rawDate.substring(0, 2)}`;
     const month = rawDate.substring(2, 4);
     const day = rawDate.substring(4, 6);
-    return new Date(`${year}-${month}-${day}`).toLocaleDateString('en-US', { 
+    return new Date(`${year}-${month}-${day}`).toLocaleDateString('en-GB', { 
       year: 'numeric', month: 'short', day: 'numeric' 
     });
   };
 
-const filteredUsers = useMemo(() => {
-  // 1. Filter and Group by Username
-  const grouped = users.reduce((acc, cert) => {
-    const name = cert.username.toLowerCase();
+  const handleReasonChange = (username, reason) => {
+    setRevocationReasons(prev => ({ ...prev, [username]: reason }));
+  };
+
+  const handleRevoke = async () => {
+    const commonName = revokeModal.user.username;
+    const reason = revocationReasons[commonName] || 'unspecified';
     
-    // Basic filtering (Search term, No Admin)
-    const matchesSearch = name.includes(searchTerm.toLowerCase()) && name !== "admin";
-    if (!matchesSearch) return acc;
-
-    // Logic: If user exists, check if current cert is "Active/Unapproved" while existing is "Revoked"
-    if (!acc[name]) {
-      acc[name] = cert;
-    } else {
-      // Prioritization: If the existing one is Revoked, but this new one isn't, swap them.
-      if (acc[name].status === 'Revoked' && cert.status !== 'Revoked') {
-        acc[name] = cert;
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: commonName, reason }) 
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
       }
+    } catch (err) {
+      alert("System communication error during revocation.");
+    } finally {
+      setRevokeModal({ open: false, user: null });
     }
-    return acc;
-  }, {});
+  };
 
-  // 2. Convert group back to array and apply Status Filter + Sort
-  return Object.values(grouped)
-    .filter(user => {
-      return statusFilter === 'All' || user.status === statusFilter;
-    })
-    .sort((a, b) => a.expiration.localeCompare(b.expiration));
-}, [users, searchTerm, statusFilter]);
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter(cert => {
+        const name = cert.username.toLowerCase();
+        return (
+          name !== "admin" &&
+          name.includes(searchTerm.toLowerCase()) &&
+          (statusFilter === 'All' || cert.status === statusFilter)
+        );
+      })
+      .sort((a, b) => a.expiration.localeCompare(b.expiration));
+  }, [users, searchTerm, statusFilter]);
 
-  // --- NEW REISSUE LOGIC ---
   const handleReissueClick = async (targetUsername) => {
     setFetchingUser(targetUsername);
     try {
-      // 1. Fetch the full certificate details from your new API
       const res = await fetch(`http://localhost:5000/api/admin/user-details/${targetUsername}`);
       const data = await res.json();
-
       if (data.success) {
-        // 2. Navigate to enroll and pass the FULL details extracted from the cert
         navigate('/enroll', { state: { editUser: data.user } });
       } else {
         alert("Error: " + data.message);
@@ -98,85 +121,135 @@ const filteredUsers = useMemo(() => {
     }
   };
 
-  const handleRevoke = async (commonName) => {
-    if (window.confirm(`Revoke certificate for ${commonName}?`)) {
-      try {
-        await fetch('http://localhost:5000/api/admin/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: commonName }) 
-        });
-        fetchUsers();
-      } catch (err) {
-        alert("Revocation failed");
-      }
-    }
-  };
-
   return (
-    <Container maxWidth="lg" sx={{ mt: 5, mb: 5 }}>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* SECURITY HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold" color="primary">PKI Control Center</Typography>
-          <Typography variant="body2" color="textSecondary">Manage active and revoked identities</Typography>
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <ShieldIcon color="primary" sx={{ fontSize: 35 }} />
+          <Box>
+            <Typography variant="h5" fontWeight="800" sx={{ letterSpacing: '-0.5px' }}>
+              PKI COMMAND CENTER
+            </Typography>
+            <Typography variant="caption" color="textSecondary" sx={{ textTransform: 'uppercase', fontWeight: 600 }}>
+              Access Control & Revocation Management
+            </Typography>
+          </Box>
         </Box>
-        <Button variant="contained" startIcon={<EnrollIcon />} onClick={() => navigate('/enroll')}>
-          Enroll New User
+        <Button 
+          variant="contained" 
+          disableElevation
+          startIcon={<EnrollIcon />} 
+          onClick={() => navigate('/enroll')}
+          sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 700 }}
+        >
+          Enroll Identity
         </Button>
       </Box>
 
-      <Box display="flex" gap={2} mb={3}>
-        <TextField label="Search by Name" variant="outlined" size="small" sx={{ flexGrow: 1 }} 
+      {/* FILTER BAR */}
+      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, borderRadius: 2 }}>
+        <TextField 
+          placeholder="Search identity..." 
+          variant="outlined" size="small" sx={{ flexGrow: 1 }} 
           value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} /> }}
         />
-        <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Status</InputLabel>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status">
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <MenuItem value="All">All Statuses</MenuItem>
             <MenuItem value="Valid">Valid</MenuItem>
             <MenuItem value="Revoked">Revoked</MenuItem>
           </Select>
         </FormControl>
-      </Box>
+      </Paper>
 
-      <TableContainer component={Paper} elevation={6} sx={{ borderRadius: 3 }}>
+      {/* DATA TABLE */}
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0' }}>
         {loading ? (
-          <Box p={8} textAlign="center"><CircularProgress /></Box>
+          <Box p={10} textAlign="center"><CircularProgress thickness={5} /></Box>
         ) : (
-          <Table>
-            <TableHead sx={{ bgcolor: 'grey.100' }}>
+          <Table stickyHeader>
+            <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Serial</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Expiration Date</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 700, bgcolor: '#f8f9fa' }}>STATUS</TableCell>
+                <TableCell sx={{ fontWeight: 700, bgcolor: '#f8f9fa' }}>IDENTITY</TableCell>
+                <TableCell sx={{ fontWeight: 700, bgcolor: '#f8f9fa' }}>SERIAL</TableCell>
+                <TableCell sx={{ fontWeight: 700, bgcolor: '#f8f9fa' }}>EXPIRATION</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, bgcolor: '#f8f9fa' }}>MANAGEMENT</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredUsers.map((user) => (
                 <TableRow key={user.serial} hover>
                   <TableCell>
-                    <Chip label={user.status.toUpperCase()} color={user.status === 'Valid' ? 'success' : 'error'} size="small" />
+                    <Chip 
+                      label={user.status} 
+                      color={user.status === 'Valid' ? 'success' : 'error'} 
+                      size="small" 
+                      sx={{ fontWeight: 'bold', px: 1 }} 
+                    />
                   </TableCell>
-                  <TableCell><Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{user.username}</Typography></TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>{user.serial}</TableCell>
+                  <TableCell>
+                    <Typography variant="subtitle2" fontWeight="700">{user.username}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <SerialIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                      <Typography variant="body2" sx={{ fontFamily: 'Monaco, monospace', color: 'text.secondary' }}>
+                        {user.serial}
+                      </Typography>
+                    </Box>
+                  </TableCell>
                   <TableCell>{formatDate(user.expiration)}</TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Modify / Reissue">
-                        <IconButton 
-                          color="primary" 
-                          size="small" 
-                          onClick={() => handleReissueClick(user.username)}
-                          disabled={fetchingUser === user.username}
-                        >
-                          {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
-                        </IconButton>
-                    </Tooltip>
-                    <IconButton color="error" size="small" disabled={user.status === 'Revoked'} onClick={() => handleRevoke(user.username)}>
-                      <RevokeIcon fontSize="small" />
-                    </IconButton>
+                    <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+                      
+                      {/* ACTION GROUP: Only visible for Valid Certificates */}
+                      {user.status === 'Valid' ? (
+                        <>
+                          <Tooltip title="Modify / Reissue">
+                            <IconButton 
+                              color="primary" 
+                              size="small" 
+                              onClick={() => handleReissueClick(user.username)}
+                              disabled={fetchingUser === user.username}
+                            >
+                              {fetchingUser === user.username ? <CircularProgress size={18} /> : <ReissueIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+
+                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <Select
+                              value={revocationReasons[user.username] || 'unspecified'}
+                              onChange={(e) => handleReasonChange(user.username, e.target.value)}
+                              sx={{ height: 32, fontSize: '0.8rem', bgcolor: '#fff' }}
+                            >
+                              {REVOCATION_REASONS.map(r => (
+                                <MenuItem key={r.value} value={r.value} sx={{ fontSize: '0.8rem' }}>{r.label}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          <Tooltip title="Revoke Certificate">
+                            <IconButton 
+                              color="error" 
+                              size="small" 
+                              onClick={() => setRevokeModal({ open: true, user })}
+                            >
+                              <RevokeIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        /* Placeholder for Revoked items to maintain clean UI */
+                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', pr: 1 }}>
+                          No active actions
+                        </Typography>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -184,6 +257,26 @@ const filteredUsers = useMemo(() => {
           </Table>
         )}
       </TableContainer>
+
+      {/* SECURITY CONFIRMATION DIALOG */}
+      <Dialog open={revokeModal.open} onClose={() => setRevokeModal({ open: false, user: null })}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Revocation Confirmation</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This will push Serial <b>{revokeModal.user?.serial}</b> to the CRL.
+          </Alert>
+          <Typography variant="body2">
+            Are you sure you want to revoke <b>{revokeModal.user?.username}</b>? 
+            Reason: <b>{revocationReasons[revokeModal.user?.username] || 'unspecified'}</b>.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setRevokeModal({ open: false, user: null })} color="inherit">Cancel</Button>
+          <Button onClick={handleRevoke} variant="contained" color="error" autoFocus>
+            Confirm Revocation
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
