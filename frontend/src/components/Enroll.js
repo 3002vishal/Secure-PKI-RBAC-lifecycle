@@ -211,7 +211,7 @@ export default function App() {
               {isEditMode ? "Identity Modification" : "Enrollment Portal"}
             </Typography>
           </Box>
-          <Chip icon={<SecurityIcon />} label="PKI + HSM Protected" sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }} />
+          <Chip icon={<SecurityIcon />} label="PKI  Protected" sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }} />
         </Box>
 
         <Paper elevation={6} sx={{ p: 4, borderRadius: 3 }}>

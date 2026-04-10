@@ -4,7 +4,7 @@ import {
   Container, Typography, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, Chip, IconButton, 
   Tooltip, Box, CircularProgress, TextField, MenuItem, Select, 
-  FormControl, InputLabel, Divider, Dialog, DialogTitle, 
+  FormControl, Divider, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert
 } from '@mui/material';
 import { 
@@ -91,27 +91,18 @@ const AdminDashboard = () => {
   };
 
   const filteredUsers = useMemo(() => {
-    const grouped = users.reduce((acc, cert) => {
-      const name = cert.username.toLowerCase();
-      const matchesSearch = name.includes(searchTerm.toLowerCase()) && name !== "admin";
-      if (!matchesSearch) return acc;
-
-      if (!acc[name]) {
-        acc[name] = cert;
-      } else {
-        if (acc[name].status === 'Revoked' && cert.status !== 'Revoked') {
-          acc[name] = cert;
-        }
-      }
-      return acc;
-    }, {});
-
-    return Object.values(grouped)
-      .filter(user => statusFilter === 'All' || user.status === statusFilter)
+    return users
+      .filter(cert => {
+        const name = cert.username.toLowerCase();
+        return (
+          name !== "admin" &&
+          name.includes(searchTerm.toLowerCase()) &&
+          (statusFilter === 'All' || cert.status === statusFilter)
+        );
+      })
       .sort((a, b) => a.expiration.localeCompare(b.expiration));
   }, [users, searchTerm, statusFilter]);
 
-  // --- YOUR ORIGINAL REISSUE LOGIC ---
   const handleReissueClick = async (targetUsername) => {
     setFetchingUser(targetUsername);
     try {
@@ -214,23 +205,22 @@ const AdminDashboard = () => {
                   <TableCell align="right">
                     <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
                       
-                      {/* REISSUE */}
-                      <Tooltip title="Modify / Reissue">
-                        <IconButton 
-                          color="primary" 
-                          size="small" 
-                          onClick={() => handleReissueClick(user.username)}
-                          disabled={fetchingUser === user.username}
-                        >
-                          {fetchingUser === user.username ? <CircularProgress size={18} /> : <ReissueIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-
-                      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-                      {/* REASON SELECT (Only Active Users) */}
-                      {user.status !== 'Revoked' && (
+                      {/* ACTION GROUP: Only visible for Valid Certificates */}
+                      {user.status === 'Valid' ? (
                         <>
+                          <Tooltip title="Modify / Reissue">
+                            <IconButton 
+                              color="primary" 
+                              size="small" 
+                              onClick={() => handleReissueClick(user.username)}
+                              disabled={fetchingUser === user.username}
+                            >
+                              {fetchingUser === user.username ? <CircularProgress size={18} /> : <ReissueIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+
+                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
                           <FormControl size="small" sx={{ minWidth: 150 }}>
                             <Select
                               value={revocationReasons[user.username] || 'unspecified'}
@@ -253,6 +243,11 @@ const AdminDashboard = () => {
                             </IconButton>
                           </Tooltip>
                         </>
+                      ) : (
+                        /* Placeholder for Revoked items to maintain clean UI */
+                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', pr: 1 }}>
+                          No active actions
+                        </Typography>
                       )}
                     </Box>
                   </TableCell>
