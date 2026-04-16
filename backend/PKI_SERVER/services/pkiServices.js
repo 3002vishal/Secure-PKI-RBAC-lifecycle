@@ -1,28 +1,65 @@
 const forge = require("node-forge");
 const fs = require("fs");
 const { execSync } = require("child_process");
-const { ROOT_CA_PEM, INT_CA_PEM, CRL_PATH , CERT_DIR} = require("../config/certConfig");
+const {INTERMEDIATE_DIR, ROOT_CA_PEM, INT_CA_PEM, CRL_PATH , CERT_DIR,CHAIN_PATH,INTERMEDIATE_CA_PATH,ROOT_CA_PATH} = require("../config/certConfig");
 const path  = require('path');
 
-function isCertificateRevoked(certPem) {
+
+
+
+
+/**
+ * @param {string} certPem - The PEM text of the user certificate
+ * @param {string} intCaPath - The FILE PATH to your intermediate CA (e.g., 'backend/demoCA/intermediate/int.cert.pem')
+ * @param {string} chainPath - The FILE PATH to your chain (e.g., 'backend/demoCA/intermediate/chain.pem')
+ */
+function isCertificateRevoked(certPem, intCaPath, chainPath) {
   try {
-    const userCert = forge.pki.certificateFromPem(certPem);
-    const serialNumber = userCert.serialNumber.toLowerCase();
+    const forgeCert = forge.pki.certificateFromPem(certPem);
+    // Get the raw serial number
+    const serialNumber = forgeCert.serialNumber; 
+    
+    // 1. Get all files in the newcerts directory
+    const newcertsDir = path.resolve(INTERMEDIATE_DIR, "newcerts");
+    const files = fs.readdirSync(newcertsDir);
 
+    // 2. Find the file that matches the serial number (case-insensitive)
+    // This matches "101d.pem", "101D.PEM", or "101D.pem"
+    const matchedFile = files.find(file => 
+      file.toLowerCase() === `${serialNumber.toLowerCase()}.pem`
+    );
 
-    if (!fs.existsSync(CRL_PATH)) return false;
+    if (!matchedFile) {
+      console.error(`Cert file not found for serial: ${serialNumber} in ${newcertsDir}`);
+      return true; // Fail-closed
+    }
 
-    //console.log("crl_path", CRL_PATH);
+    const existingCertPath = path.join(newcertsDir, matchedFile);
+    console.log(`Checking OCSP for existing file: ${existingCertPath}`);
 
-    const revokedSerials = execSync(`openssl crl -inform PEM -in "${CRL_PATH}" -text -noout`)
-      .toString()
-      .toLowerCase();
-      //console.log("revoked_serial ", revokedSerials);
+    // 3. Ensure your CA paths are valid (not undefined)
+    const issuer = intCaPath || INTERMEDIATE_CA_PATH;
+    const chain = chainPath || CHAIN_PATH;
 
-    return revokedSerials.includes(serialNumber);
+    if (!issuer || issuer === "undefined") {
+        throw new Error("Issuer path is missing or undefined");
+    }
+
+    // 4. Run the command
+    const ocspCommand = `openssl ocsp -issuer "${issuer}" -cert "${existingCertPath}" -url http://127.0.0.1:8888 -CAfile "${chain}" -no_nonce`;
+    
+    const output = execSync(ocspCommand).toString();
+    console.log("OCSP Response:", output.trim());
+
+    return !output.toLowerCase().includes(": good");
+
   } catch (err) {
-    console.error("CRL Check Failed:", err.message);
-    return true; // Fail-closed
+    if (err.stdout && err.stdout.toString().toLowerCase().includes(": revoked")) {
+        console.log("OCSP confirmed: Certificate is REVOKED");
+        return true;
+    }
+    console.error("OCSP Check Error:", err.message);
+    return true; 
   }
 }
 
