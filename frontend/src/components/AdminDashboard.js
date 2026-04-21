@@ -46,35 +46,26 @@ const AdminDashboard = () => {
       year: 'numeric', month: 'short', day: 'numeric' 
     });
   };
-
 const filteredUsers = useMemo(() => {
-  // 1. Filter and Group by Username
-  const grouped = users.reduce((acc, cert) => {
-    const name = cert.username.toLowerCase();
-    
-    // Basic filtering (Search term, No Admin)
-    const matchesSearch = name.includes(searchTerm.toLowerCase()) && name !== "admin";
-    if (!matchesSearch) return acc;
+  return users
+    .filter((cert) => {
+      const name = cert.username.toLowerCase();
+      
+      // 1. Hard filter: Remove admin
+      if (name === "admin") return false;
 
-    // Logic: If user exists, check if current cert is "Active/Unapproved" while existing is "Revoked"
-    if (!acc[name]) {
-      acc[name] = cert;
-    } else {
-      // Prioritization: If the existing one is Revoked, but this new one isn't, swap them.
-      if (acc[name].status === 'Revoked' && cert.status !== 'Revoked') {
-        acc[name] = cert;
-      }
-    }
-    return acc;
-  }, {});
+      // 2. Filter by search term
+      const matchesSearch = name.includes(searchTerm.toLowerCase());
+      
+      // 3. Filter by status (e.g., 'Valid', 'Revoked', or 'All')
+      const matchesStatus = statusFilter === 'All' || cert.status === statusFilter;
 
-  // 2. Convert group back to array and apply Status Filter + Sort
-  return Object.values(grouped)
-    .filter(user => {
-      return statusFilter === 'All' || user.status === statusFilter;
+      return matchesSearch && matchesStatus;
     })
+    // 4. Sort the final list by expiration date
     .sort((a, b) => a.expiration.localeCompare(b.expiration));
 }, [users, searchTerm, statusFilter]);
+
 
   // --- NEW REISSUE LOGIC ---
   const handleReissueClick = async (targetUsername) => {
