@@ -17,7 +17,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [fetchingUser, setFetchingUser] = useState(null); // Local loading for reissue
+  const [fetchingUser, setFetchingUser] = useState(null);
   const navigate = useNavigate();
 
   const fetchUsers = async () => {
@@ -46,37 +46,26 @@ const AdminDashboard = () => {
       year: 'numeric', month: 'short', day: 'numeric' 
     });
   };
-const filteredUsers = useMemo(() => {
-  return users
-    .filter((cert) => {
-      const name = cert.username.toLowerCase();
-      
-      // 1. Hard filter: Remove admin
-      if (name === "admin") return false;
 
-      // 2. Filter by search term
-      const matchesSearch = name.includes(searchTerm.toLowerCase());
-      
-      // 3. Filter by status (e.g., 'Valid', 'Revoked', or 'All')
-      const matchesStatus = statusFilter === 'All' || cert.status === statusFilter;
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter((cert) => {
+        const name = cert.username.toLowerCase();
+        if (name === "admin") return false;
+        const matchesSearch = name.includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'All' || cert.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => a.expiration.localeCompare(b.expiration));
+  }, [users, searchTerm, statusFilter]);
 
-      return matchesSearch && matchesStatus;
-    })
-    // 4. Sort the final list by expiration date
-    .sort((a, b) => a.expiration.localeCompare(b.expiration));
-}, [users, searchTerm, statusFilter]);
-
-
-  // --- NEW REISSUE LOGIC ---
   const handleReissueClick = async (targetUsername) => {
     setFetchingUser(targetUsername);
     try {
-      // 1. Fetch the full certificate details from your new API
       const res = await fetch(`http://localhost:5000/api/admin/user-details/${targetUsername}`);
       const data = await res.json();
 
       if (data.success) {
-        // 2. Navigate to enroll and pass the FULL details extracted from the cert
         navigate('/enroll', { state: { editUser: data.user } });
       } else {
         alert("Error: " + data.message);
@@ -155,17 +144,28 @@ const filteredUsers = useMemo(() => {
                   <TableCell sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>{user.serial}</TableCell>
                   <TableCell>{formatDate(user.expiration)}</TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Modify / Reissue">
-                        <IconButton 
-                          color="primary" 
-                          size="small" 
-                          onClick={() => handleReissueClick(user.username)}
-                          disabled={fetchingUser === user.username}
-                        >
-                          {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
-                        </IconButton>
+                    
+                    {/* MODIFIED: Reissue button now disables if status is Revoked */}
+                    <Tooltip title={user.status === 'Revoked' ? "Cannot reissue revoked certificate" : "Modify / Reissue"}>
+                        <span> {/* Span wrapper ensures tooltip works on disabled buttons */}
+                          <IconButton 
+                            color="primary" 
+                            size="small" 
+                            onClick={() => handleReissueClick(user.username)}
+                            // Disables if currently fetching OR if the certificate is revoked
+                            disabled={fetchingUser === user.username || user.status === 'Revoked'}
+                          >
+                            {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
                     </Tooltip>
-                    <IconButton color="error" size="small" disabled={user.status === 'Revoked'} onClick={() => handleRevoke(user.username)}>
+
+                    <IconButton 
+                      color="error" 
+                      size="small" 
+                      disabled={user.status === 'Revoked'} 
+                      onClick={() => handleRevoke(user.username)}
+                    >
                       <RevokeIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
