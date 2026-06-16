@@ -8,6 +8,28 @@ const SIGNER_CERT = path.resolve(__dirname, 'demoCA/intermediate/int.cert.pem');
 const SIGNER_KEY = path.resolve(__dirname, 'demoCA/intermediate/private/int.key.pem');
 const CA_CHAIN = path.resolve(__dirname, 'demoCA/intermediate/chain.pem');
 
+// Helper to print binary OCSP Request in plain text
+function logOcspRequest(buffer) {
+    const parser = spawn('openssl', ['ocsp', '-req_text', '-reqin', '-']);
+    parser.stdout.on('data', (data) => {
+        console.log('\n--- 📥 INCOMING OCSP REQUEST ---');
+        console.log(data.toString());
+    });
+    parser.stdin.write(buffer);
+    parser.stdin.end();
+}
+
+// Helper to print binary OCSP Response in plain text
+function logOcspResponse(buffer) {
+    const parser = spawn('openssl', ['ocsp', '-respin', '-', '-text', '-noverify']);
+    parser.stdout.on('data', (data) => {
+        console.log('\n--- 📤 OUTGOING OCSP RESPONSE ---');
+        console.log(data.toString());
+    });
+    parser.stdin.write(buffer);
+    parser.stdin.end();
+}
+
 const server = http.createServer((req, res) => {
     if (req.method !== 'POST') {
         res.writeHead(405);
@@ -19,9 +41,9 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
         const fullBody = Buffer.concat(body);
 
-        
-        // -reqin -  means read request from stdin
-        // -respout - means write response to stdout
+        // 1. Log the parsed request to terminal
+        logOcspRequest(fullBody);
+
         const ocsp = spawn('openssl', [
             'ocsp',
             '-index', INDEX_PATH,
@@ -45,11 +67,15 @@ const server = http.createServer((req, res) => {
                 return res.end('OCSP Processing Error');
             }
 
+            const fullResponse = Buffer.concat(responseData);
+
+            // 2. Log the parsed response to terminal
+            logOcspResponse(fullResponse);
+
             res.writeHead(200, { 'Content-Type': 'application/ocsp-response' });
-            res.end(Buffer.concat(responseData));
+            res.end(fullResponse);
         });
 
-        // Feed the request body to OpenSSL
         ocsp.stdin.write(fullBody);
         ocsp.stdin.end();
     });
