@@ -176,7 +176,7 @@ export default function App() {
     addLog(`${isEditMode ? 'Modifying' : 'Starting enrollment for'} user: ${username}`, "process");
 
     try {
-      addLog(`Connecting to HSM Bridge (${endpoint})...`, "process");
+      addLog(`Connecting to  Bridge (${endpoint})...`, "process");
       addLog(`Encoding Access Matrix: ${JSON.stringify(serviceRoles)}`, "info");
 
       const response = await fetch(endpoint, {
@@ -202,7 +202,7 @@ export default function App() {
         setActiveStep(2);
       } else {
         if (result.message && (result.message.includes("0x80090023") || result.message.includes("STORAGE_FULL"))) {
-          addLog("CRITICAL ERROR: HSM Token Storage is full. No space for new keys.", "error");
+          addLog("CRITICAL ERROR: Crypto Token Storage is full. No space for new keys.", "error");
           addLog("HINT: Please manually delete old containers using 'certutil -delkey' or clear the token.", "warning");
         }
         throw new Error(result.message || "Operation failed");
@@ -227,7 +227,7 @@ export default function App() {
               {isEditMode ? "Identity Modification" : "Enrollment Portal"}
             </Typography>
           </Box>
-          <Chip icon={<SecurityIcon />} label="PKI + HSM Protected" sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }} />
+         
         </Box>
 
         <Paper elevation={6} sx={{ p: 4, borderRadius: 3 }}>
