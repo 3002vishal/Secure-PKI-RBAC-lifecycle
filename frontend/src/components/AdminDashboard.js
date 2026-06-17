@@ -31,11 +31,6 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [fetchingUser, setFetchingUser] = useState(null);
-  const [revocationReasons, setRevocationReasons] = useState({});
-  
-  // Security Modal State
-  const [revokeModal, setRevokeModal] = useState({ open: false, user: null });
-
   const navigate = useNavigate();
 
   const fetchUsers = async () => {
@@ -65,40 +60,14 @@ const AdminDashboard = () => {
     });
   };
 
-  const handleReasonChange = (username, reason) => {
-    setRevocationReasons(prev => ({ ...prev, [username]: reason }));
-  };
-
-  const handleRevoke = async () => {
-    const commonName = revokeModal.user.username;
-    const reason = revocationReasons[commonName] || 'unspecified';
-    
-    try {
-      const res = await fetch('http://localhost:5000/api/admin/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: commonName, reason }) 
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchUsers();
-      }
-    } catch (err) {
-      alert("System communication error during revocation.");
-    } finally {
-      setRevokeModal({ open: false, user: null });
-    }
-  };
-
   const filteredUsers = useMemo(() => {
     return users
-      .filter(cert => {
+      .filter((cert) => {
         const name = cert.username.toLowerCase();
-        return (
-          name !== "admin" &&
-          name.includes(searchTerm.toLowerCase()) &&
-          (statusFilter === 'All' || cert.status === statusFilter)
-        );
+        if (name === "admin") return false;
+        const matchesSearch = name.includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'All' || cert.status === statusFilter;
+        return matchesSearch && matchesStatus;
       })
       .sort((a, b) => a.expiration.localeCompare(b.expiration));
   }, [users, searchTerm, statusFilter]);
@@ -203,53 +172,30 @@ const AdminDashboard = () => {
                   </TableCell>
                   <TableCell>{formatDate(user.expiration)}</TableCell>
                   <TableCell align="right">
-                    <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                      
-                      {/* ACTION GROUP: Only visible for Valid Certificates */}
-                      {user.status === 'Valid' ? (
-                        <>
-                          <Tooltip title="Modify / Reissue">
-                            <IconButton 
-                              color="primary" 
-                              size="small" 
-                              onClick={() => handleReissueClick(user.username)}
-                              disabled={fetchingUser === user.username}
-                            >
-                              {fetchingUser === user.username ? <CircularProgress size={18} /> : <ReissueIcon fontSize="small" />}
-                            </IconButton>
-                          </Tooltip>
+                    
+                    {/* MODIFIED: Reissue button now disables if status is Revoked */}
+                    <Tooltip title={user.status === 'Revoked' ? "Cannot reissue revoked certificate" : "Modify / Reissue"}>
+                        <span> {/* Span wrapper ensures tooltip works on disabled buttons */}
+                          <IconButton 
+                            color="primary" 
+                            size="small" 
+                            onClick={() => handleReissueClick(user.username)}
+                            // Disables if currently fetching OR if the certificate is revoked
+                            disabled={fetchingUser === user.username || user.status === 'Revoked'}
+                          >
+                            {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
+                    </Tooltip>
 
-                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-                          <FormControl size="small" sx={{ minWidth: 150 }}>
-                            <Select
-                              value={revocationReasons[user.username] || 'unspecified'}
-                              onChange={(e) => handleReasonChange(user.username, e.target.value)}
-                              sx={{ height: 32, fontSize: '0.8rem', bgcolor: '#fff' }}
-                            >
-                              {REVOCATION_REASONS.map(r => (
-                                <MenuItem key={r.value} value={r.value} sx={{ fontSize: '0.8rem' }}>{r.label}</MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-
-                          <Tooltip title="Revoke Certificate">
-                            <IconButton 
-                              color="error" 
-                              size="small" 
-                              onClick={() => setRevokeModal({ open: true, user })}
-                            >
-                              <RevokeIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      ) : (
-                        /* Placeholder for Revoked items to maintain clean UI */
-                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', pr: 1 }}>
-                          No active actions
-                        </Typography>
-                      )}
-                    </Box>
+                    <IconButton 
+                      color="error" 
+                      size="small" 
+                      disabled={user.status === 'Revoked'} 
+                      onClick={() => handleRevoke(user.username)}
+                    >
+                      <RevokeIcon fontSize="small" />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}

@@ -5,6 +5,9 @@ const CERT_DIR = path.join(__dirname ,"../../cert");
 const OPENSSL_DIR = path.join(__dirname,"../../openssl.cnf")
 const INTERMEDIATE_DIR = path.join(__dirname, "../../demoCA/intermediate");
 const CRL_PATH = path.join(INTERMEDIATE_DIR, "intermediate.crl");
+const CHAIN_PATH = path.join(INTERMEDIATE_DIR,"chain.pem");
+const INTERMEDIATE_CA_PATH = path.join(INTERMEDIATE_DIR,"int.cert.pem");
+const ROOT_CA_PATH = path.join(INTERMEDIATE_DIR,"../root/ca.cert.pem");
 
 if(!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR, {recursive: true});
 
@@ -17,4 +20,4 @@ const INT_CA_PEM = fs.readFileSync(path.join(INTERMEDIATE_DIR,"int.cert.pem"), "
 // console.log("root_ca_pem:", ROOT_CA_PEM, "\n");
 // console.log("int_ca_pem:", INT_CA_PEM, "\n");
 
-module.exports = {CERT_DIR, INTERMEDIATE_DIR, CRL_PATH, ROOT_CA_PEM, INT_CA_PEM,OPENSSL_DIR}
+module.exports = {CERT_DIR, INTERMEDIATE_DIR, CRL_PATH, ROOT_CA_PEM, INT_CA_PEM,OPENSSL_DIR, CHAIN_PATH, INTERMEDIATE_CA_PATH, ROOT_CA_PATH}

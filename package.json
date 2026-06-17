@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "ocsp": "^1.2.0"
+  }
+}

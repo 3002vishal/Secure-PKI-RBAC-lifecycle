@@ -126,7 +126,7 @@ export default function App() {
       case 'error':   return { color: '#ef5350', icon: <ErrorOutlineIcon fontSize="small" /> };
       case 'process': return { color: '#42a5f5', icon: <ArrowForwardIcon fontSize="small" /> };
       case 'warning': return { color: '#ffa726', icon: <WarningAmberIcon fontSize="small" /> };
-      default:        return { color: '#bdbdbd', icon: <InfoOutlinedIcon fontSize="small" /> };
+      default:         return { color: '#bdbdbd', icon: <InfoOutlinedIcon fontSize="small" /> };
     }
   };
 
@@ -136,10 +136,18 @@ export default function App() {
   };
 
   const validatePersonalInfo = () => {
+    // Condition: Check if trimmed username is different from raw username (detects leading/trailing spaces)
     if (!username || !email || !orgUnit || !org || !state || !country) {
       setStatus({ type: 'error', msg: 'All personal fields are required.' });
       return false;
     }
+    
+    // STRICT CONDITION: No trailing spaces allowed
+    if (username.endsWith(' ')) {
+        setStatus({ type: 'error', msg: 'Username cannot end with an empty space.' });
+        return false;
+    }
+
     if (!email.includes('@')) {
       setStatus({ type: 'error', msg: 'Please enter a valid email address.' });
       return false;
@@ -168,13 +176,22 @@ export default function App() {
     addLog(`${isEditMode ? 'Modifying' : 'Starting enrollment for'} user: ${username}`, "process");
 
     try {
-      addLog(`Connecting to HSM Bridge (${endpoint})...`, "process");
+      addLog(`Connecting to  Bridge (${endpoint})...`, "process");
       addLog(`Encoding Access Matrix: ${JSON.stringify(serviceRoles)}`, "info");
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, serviceRoles, email, orgUnit, org, state, country })
+        // Ensure data is trimmed before sending to server
+        body: JSON.stringify({ 
+            username: username.trim(), 
+            serviceRoles, 
+            email, 
+            orgUnit, 
+            org, 
+            state, 
+            country 
+        })
       });
 
       const result = await response.json();
@@ -184,9 +201,8 @@ export default function App() {
         setStatus({ type: 'success', msg: isEditMode ? '🎉 Update Complete! Your new certificate has been issued.' : '🎉 Enrollment Complete!' });
         setActiveStep(2);
       } else {
-        // --- STORAGE FULL DETECTION ---
         if (result.message && (result.message.includes("0x80090023") || result.message.includes("STORAGE_FULL"))) {
-          addLog("CRITICAL ERROR: HSM Token Storage is full. No space for new keys.", "error");
+          addLog("CRITICAL ERROR: Crypto Token Storage is full. No space for new keys.", "error");
           addLog("HINT: Please manually delete old containers using 'certutil -delkey' or clear the token.", "warning");
         }
         throw new Error(result.message || "Operation failed");
@@ -211,7 +227,7 @@ export default function App() {
               {isEditMode ? "Identity Modification" : "Enrollment Portal"}
             </Typography>
           </Box>
-          <Chip icon={<SecurityIcon />} label="PKI  Protected" sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }} />
+         
         </Box>
 
         <Paper elevation={6} sx={{ p: 4, borderRadius: 3 }}>
@@ -232,9 +248,13 @@ export default function App() {
                   <TextField
                     label="Username (Common Name)" 
                     variant="outlined" fullWidth required
-                    value={username} onChange={(e) => setUsername(e.target.value)}
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)}
+                    onBlur={() => setUsername(username.trim())} // Automatically trims when user leaves the field
                     disabled={loading || isEditMode}
                     InputProps={{ startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} /> }}
+                    helperText={username.endsWith(' ') ? "Trailing spaces will be removed" : ""}
+                    error={username.endsWith(' ')}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
