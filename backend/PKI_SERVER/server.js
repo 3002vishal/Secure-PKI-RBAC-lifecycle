@@ -5,11 +5,13 @@ const certController = require("./controllers/certController");
 const { verifyAccess } = require("./middleware/authMiddleware");
 // top of server.js
 const adminController = require('./controllers/adminController'); // Added the 'r'
+require('dotenv').config();
+const serviceRoutes = require('./routes/serviceRoutes')
 
 // route line
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(express.json());
@@ -26,6 +28,8 @@ app.post("/api/verify-certificate", certController.verify);
 app.get("/api/admin/get-user-detail",certController.getUserList);
 app.post("/api/modify", certController.modify);
 app.get("/api/admin/user-details/:username",adminController.getUserDetailsForEdit);
+
+app.use('/api/services',serviceRoutes);
 
 // Protected Service Routes (RBAC)
 app.post("/services/zero-trust", 
