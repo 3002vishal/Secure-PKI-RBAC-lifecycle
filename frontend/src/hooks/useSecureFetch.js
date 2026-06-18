@@ -37,12 +37,12 @@ export const useSecureFetch = (username) => {
           body: JSON.stringify({ challenge })
         });
       } catch (e) {
-        throw new Error("your bridge server is not running. Please start hsm-bridge.exe");
+        throw new Error("Your bridge server is not running. Please start hsm-bridge.exe");
       }
 
       const signData = await signRes.json();
 
-      // --- ERROR HANDLING LOGIC STARTS HERE ---
+      // --- ERROR HANDLING LOGIC ---
       if (signRes.status !== 200 || signData.status !== 'success') {
         const rawError = signData.details || signData.error || "";
 
@@ -51,11 +51,11 @@ export const useSecureFetch = (username) => {
           rawError.includes("Keyset does not exist") ||
           rawError.includes("keyset is not defined") ||
           rawError.includes("No_Private_Key_Found") ||
-          rawError.includes("null-valued expression") || // The specific error you saw earlier
+          rawError.includes("null-valued expression") || 
           rawError.includes("Certificate disappeared");
 
         if (isKeyMissing) {
-          throw new Error(" Private Key not found corresponding your  certificate.");
+          throw new Error("Private Key not found corresponding to your certificate.");
         } else {
           throw new Error(`Hardware Sign Failed: ${rawError}`);
         }
@@ -65,7 +65,7 @@ export const useSecureFetch = (username) => {
       const signature = signData.signature;
 
       // ------------------------------------------------
-      // STEP 3: Actual API Call with Signature
+      // STEP 3: Actual API Call with Signature (Handles JSON or HTML text)
       // ------------------------------------------------
       console.log(`[SecureFetch] Sending authenticated request to ${endpoint}...`);
       
@@ -81,17 +81,35 @@ export const useSecureFetch = (username) => {
         body: JSON.stringify(finalBody)
       });
 
-      const data = await apiRes.json();
-
+      // Catch error objects before checking content-type formats
       if (!apiRes.ok) {
-        throw new Error(data.error || "API Request Denied.");
+        const contentType = apiRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await apiRes.json();
+          throw new Error(errData.error || "API Request Denied.");
+        } else {
+          const errText = await apiRes.text();
+          throw new Error(errText || `API Request Denied with status ${apiRes.status}`);
+        }
       }
-      console.log("data", data);
-      return data;
+
+      // FIXED: Dynamic Content Parsing Rule Engine
+      const contentType = apiRes.headers.get("content-type");
+      let responseData;
+
+      if (contentType && contentType.includes("application/json")) {
+        console.log("[SecureFetch] Parsing response as JSON object.");
+        responseData = await apiRes.json();
+      } else {
+        console.log("[SecureFetch] Parsing response as raw payload stream (HTML/Text).");
+        responseData = await apiRes.text();
+      }
+
+      console.log("[SecureFetch] Request execution completed successfully.");
+      return responseData;
 
     } catch (err) {
       console.error("[SecureFetch Error]", err);
-      // We set the user-friendly error message we generated above
       setError(err.message);
       return null; // Return null so the component knows it failed
     } finally {

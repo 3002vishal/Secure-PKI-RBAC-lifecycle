@@ -38,8 +38,83 @@ app.post("/services/zero-trust",
 );
 
 app.post("/services/pki", 
-    verifyAccess("PKI Management", ["PKI Admin", "Cert Operator", "PKI Auditor"]), 
-    (req, res) => res.json({ data: "PKI ACCESS", role: req.userRole })
+    verifyAccess("pki services", ["PKI Admin", "Cert Operator", "PKI Auditor"]), 
+    (req, res) => {
+        // Optional: Get the user identity passed from req.body
+        const userPrincipal = req.body.username || "Authenticated Token";
+        const userRole = req.userRole || "Authorized Operator";
+
+        // Send a complete raw HTML page string back
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>PKI Management Console</title>
+                <style>
+                    body {
+                        background-color: #0a0e27;
+                        color: #00ff41;
+                        font-family: 'Courier New', Courier, monospace;
+                        margin: 0;
+                        padding: 30px;
+                    }
+                    .container {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        border: 1px solid #00ff41;
+                        padding: 20px;
+                        box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+                        border-radius: 4px;
+                    }
+                    h1 {
+                        border-bottom: 2px solid #00ff41;
+                        padding-bottom: 10px;
+                        font-size: 1.8rem;
+                        letter-spacing: 1px;
+                    }
+                    .meta-box {
+                        background-color: rgba(255, 255, 255, 0.05);
+                        padding: 15px;
+                        border-left: 3px solid #00ff41;
+                        margin: 20px 0;
+                    }
+                    .btn {
+                        background-color: #00ff41;
+                        color: #0a0e27;
+                        border: none;
+                        padding: 10px 20px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        font-family: monospace;
+                        border-radius: 2px;
+                    }
+                    .btn:hover {
+                        background-color: #00cc33;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🔒 SECURE PKI EXECUTION BOUNDARY</h1>
+                    
+                    <div class="meta-box">
+                        <p><strong>PRINCIPAL IDENTITY:</strong> ${userPrincipal.toUpperCase()}</p>
+                        <p><strong>SECURITY PRIVILEGE:</strong> ${userRole}</p>
+                        <p><strong>STATUS:</strong> MUTUAL TLS HANDSHAKE SUCCESSFUL</p>
+                    </div>
+
+                    <p>Welcome to the isolated PKI Management environment. From here, you can sign certificates, manage keys, and update CRL files dynamically.</p>
+                    
+                    <button class="btn" onclick="alert('Executing cryptographic operation...')">
+                        Initialize CA Operations
+                    </button>
+                </div>
+            </body>
+            </html>
+        `);
+    }
 );
 
 app.post("/services/hsm", 

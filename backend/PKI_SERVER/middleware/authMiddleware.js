@@ -27,12 +27,15 @@ const verifyAccess = (service, allowedRoles) => (req, res, next) => {
     if (!valid) return res.status(403).json({ error: "Invalid signature" });
 
     delete challenges[username];
-    const role = getServiceRoles(username)[service];
+    const role = getServiceRoles(username)[service]; 
+    console.log("allowedRoles", allowedRoles);
+    console.log("myrole",role);
     if (!role || role === "NA" || !allowedRoles.includes(role)) {
       return res.status(403).json({ error: "Access denied : unauthorized role" });
     }
 
     req.userRole = role;
+    
     next();
   } catch (err) {
     return res.status(403).json({ error: err.message });

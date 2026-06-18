@@ -13,7 +13,8 @@ import {
   Refresh as ReissueIcon,
   Search as SearchIcon,
   Shield as ShieldIcon,
-  Fingerprint as SerialIcon
+  Fingerprint as SerialIcon,
+  Settings as SettingsIcon // Imported for the Service Management view link
 } from '@mui/icons-material';
 
 const REVOCATION_REASONS = [
@@ -32,7 +33,6 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [fetchingUser, setFetchingUser] = useState(null);
   
-  // FIXED: Added missing states to control the modal overlay and revocation meta-data
   const [revokeModal, setRevokeModal] = useState({ open: false, user: null });
   const [selectedReason, setSelectedReason] = useState('unspecified');
   
@@ -59,7 +59,6 @@ const AdminDashboard = () => {
 
   const formatDate = (rawDate) => {
     if (!rawDate || rawDate === 'null') return 'N/A';
-    // Handles OpenSSL YYMMDDHHMMSSZ string formatting safely
     const year = `20${rawDate.substring(0, 2)}`;
     const month = rawDate.substring(2, 4);
     const day = rawDate.substring(4, 6);
@@ -98,16 +97,13 @@ const AdminDashboard = () => {
     }
   };
 
-  // FIXED: Opens the confirmation modal and populates targets instead of firing immediate API execution
   const openRevokeModal = (user) => {
     setSelectedReason('unspecified');
     setRevokeModal({ open: true, user });
   };
 
-  // FIXED: Executes the actual revocation payload execution on confirmation
   const handleConfirmRevocation = async () => {
     if (!revokeModal.user) return;
-    
     try {
       const res = await fetch('http://localhost:5000/api/admin/revoke', {
         method: 'POST',
@@ -121,7 +117,6 @@ const AdminDashboard = () => {
       
       const data = await res.json();
       if (data.success) {
-        // Refresh local table view state automatically
         fetchUsers();
       } else {
         alert("Revocation failed: " + data.message);
@@ -136,7 +131,7 @@ const AdminDashboard = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* SECURITY HEADER */}
+      {/* MASTER CONTROL PANEL HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Box display="flex" alignItems="center" gap={1.5}>
           <ShieldIcon color="primary" sx={{ fontSize: 35 }} />
@@ -149,15 +144,29 @@ const AdminDashboard = () => {
             </Typography>
           </Box>
         </Box>
-        <Button 
-          variant="contained" 
-          disableElevation
-          startIcon={<EnrollIcon />} 
-          onClick={() => navigate('/enroll')}
-          sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 700 }}
-        >
-          Enroll Identity
-        </Button>
+        
+        {/* ACTION BUTTON GROUP */}
+        <Box display="flex" gap={2}>
+          {/* SERVICE MANAGEMENT NAVIGATION LINK ENTRY */}
+          <Button
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={() => navigate('/admin/service-managemnt')} // Make sure this matches your exact react-router config path
+            sx={{ borderRadius: 2, fontWeight: 700, borderWidth: '2px', '&:hover': { borderWidth: '2px' } }}
+          >
+            Manage Services
+          </Button>
+
+          <Button 
+            variant="contained" 
+            disableElevation
+            startIcon={<EnrollIcon />} 
+            onClick={() => navigate('/enroll')}
+            sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 700 }}
+          >
+            Enroll Identity
+          </Button>
+        </Box>
       </Box>
 
       {/* FILTER BAR */}
@@ -165,7 +174,7 @@ const AdminDashboard = () => {
         <TextField 
           placeholder="Search identity..." 
           variant="outlined" size="small" sx={{ flexGrow: 1 }} 
-          value={searchTerm} onChange={(e) => setSearchTerm(e.e || e.target.value)}
+          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} /> }}
         />
         <FormControl size="small" sx={{ minWidth: 160 }}>
@@ -216,7 +225,6 @@ const AdminDashboard = () => {
                   </TableCell>
                   <TableCell>{formatDate(user.expiration)}</TableCell>
                   <TableCell align="right">
-                    
                     <Tooltip title={user.status === 'Revoked' ? "Cannot reissue revoked certificate" : "Modify / Reissue"}>
                       <span>
                         <IconButton 
@@ -234,7 +242,7 @@ const AdminDashboard = () => {
                       color="error" 
                       size="small" 
                       disabled={user.status === 'Revoked'} 
-                      onClick={() => openRevokeModal(user)} // FIXED: Triggers intermediate modal layout capture
+                      onClick={() => openRevokeModal(user)}
                     >
                       <RevokeIcon fontSize="small" />
                     </IconButton>
@@ -257,7 +265,6 @@ const AdminDashboard = () => {
             Are you sure you want to invalidate the identity for <b>{revokeModal.user?.username}</b>?
           </Typography>
           
-          {/* FIXED: Form entry field allowing admins to inject CRL extension reason attributes */}
           <FormControl fullWidth size="small">
             <InputLabel id="revocation-reason-label">Reason Code</InputLabel>
             <Select
