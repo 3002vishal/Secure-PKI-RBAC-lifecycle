@@ -1,122 +1,113 @@
 const pool = require('../config/db');
 
-// get: fetch all active apps & roles matrix rows
-exports.getServices = async(req,res) => {
-    try{
-        const[rows] = await pool.query('select * from services order by id asc');
+// GET: Fetch all active apps & roles matrix rows
+exports.getServices = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM services ORDER BY id ASC');
         res.json(rows);
-        
-    }
-    catch(err){
+    } catch (err) {
         console.error("Failed to read services:", err);
-        res.status(500).json({error: "Internal Server Database Error"});
+        res.status(500).json({ error: "Internal Server Database Error" });
     }
 };
 
-// post : Inject a new service row dynamically during  live demos 
+// POST: Inject a new service row dynamically during live demos 
+exports.createService = async (req, res) => {
+    // 1. Destructure target_url from req.body
+    const { name, description, target_url, roles } = req.body;
+    
+    // Quick validation to enforce Zero Trust microservice destination routing
+    if (!target_url) {
+        return res.status(400).json({ error: "target_url is required for routing requests." });
+    }
 
-exports.createService = async(req, res) => {
-    const {name , description , roles} = req.body ;
-    try{
-        const sql = `insert into services (name , description, roles) values(? , ? , ?)`;
-        const [result] = await pool.query(sql,[
-            name, 
+    try {
+        // 2. Add target_url to the INSERT columns
+        const sql = `INSERT INTO services (name, description, target_url, roles) VALUES (?, ?, ?, ?)`;
+        const [result] = await pool.query(sql, [
+            name,
             description || "",
+            target_url,
             JSON.stringify(roles)
         ]);
+        
         res.status(201).json({
             message: "Dynamic service injected successfully!",
             id: result.insertId
         });
-
-    }
-    catch(err){
+    } catch (err) {
         console.error("Failed to insert service:", err);
-        res.status(500).json({error: err.message});
+        res.status(500).json({ error: err.message });
     }
+};
 
-}
-
-exports.deleteServices = async(req, res) => 
-{
-    const {id} = req.params;
+// DELETE: Remove a service by ID
+exports.deleteServices = async (req, res) => {
+    const { id } = req.params;
     try {
-        const sql  = `delete from services where id = ?`;
+        const sql = `DELETE FROM services WHERE id = ?`;
         const [result] = await pool.query(sql, [id]);
 
-        // check if a row was actually delted 
-        if(result.affectedRows === 0 )
-        {
-            return res.status(404).json({error: "service not found"});
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "service not found" });
         }
         res.json({
             message: "Service deleted successfully!",
             deletedId: id
         });
-        
-    }
-
-    catch(err)
-    {
-        console.error("failed to delte service:", err);
-        res.status(500).json({error: err.message});
+    } catch (err) {
+        console.error("Failed to delete service:", err);
+        res.status(500).json({ error: err.message });
     }
 };
 
-exports.updateService = async(req, res) => {
-    const {id} = req.params;
-    const {name, description , roles} = req.body;
-
-    // Build the sql qury dynamically based on what was sent 
+// UPDATE: Modify properties of a service dynamically
+exports.updateService = async (req, res) => {
+    const { id } = req.params;
+    // 3. Destructure target_url here to allow dynamic updates
+    const { name, description, target_url, roles } = req.body;
 
     const fieldsToUpdate = [];
     const queryValues = [];
 
-    if(name !== undefined)
-    {
+    if (name !== undefined) {
         fieldsToUpdate.push("name = ?");
         queryValues.push(name);
     }
-    if(description !== undefined)
-    {
+    if (description !== undefined) {
         fieldsToUpdate.push("description = ?");
         queryValues.push(description);
     }
-    if(roles !== undefined) {
+    // 4. Append target_url parameter dynamically if passed in payload
+    if (target_url !== undefined) {
+        fieldsToUpdate.push("target_url = ?");
+        queryValues.push(target_url);
+    }
+    if (roles !== undefined) {
         fieldsToUpdate.push("roles = ?");
         queryValues.push(JSON.stringify(roles));
     }
 
-    // if the user sent an empty body throw , an error 
-
-    if(fieldsToUpdate.length === 0 )
-    {
-        return res.status(400).json({error: "No feilds passed for updation"});
+    if (fieldsToUpdate.length === 0) {
+        return res.status(400).json({ error: "No fields passed for updation" });
     }
 
-    try
-    {
+    try {
         queryValues.push(id);
 
         const sql = `UPDATE services SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
-
         const [result] = await pool.query(sql, queryValues);
 
-        if(result.affectedRows === 0){
-            return res.status(404).json({error: "Service not found"});
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Service not found" });
         }
 
         res.json({
             message: "Service updated successfully!",
             updatedId: id
-
         });
-
+    } catch (err) {
+        console.error("Failed to patch service: ", err);
+        res.status(500).json({ error: err.message });
     }
-    catch(err){
-        console.error("Failed to path service: ", err);
-        res.status(500).json({error: err.message});
-    }
-
-
 };
