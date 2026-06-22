@@ -5,11 +5,13 @@ const certController = require("./controllers/certController");
 const { verifyAccess } = require("./middleware/authMiddleware");
 // top of server.js
 const adminController = require('./controllers/adminController'); // Added the 'r'
-
+require('dotenv').config();
+const serviceRoutes = require('./routes/serviceRoutes')
+const createServiceRoutes = require('./routes/createServiceRoutes')
 // route line
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(express.json());
@@ -27,35 +29,9 @@ app.get("/api/admin/get-user-detail",certController.getUserList);
 app.post("/api/modify", certController.modify);
 app.get("/api/admin/user-details/:username",adminController.getUserDetailsForEdit);
 
-// Protected Service Routes (RBAC)
-app.post("/services/zero-trust", 
-    verifyAccess("Zero Trust Gateway", ["Gateway Admin", "Policy Admin", "Access Auditor"]), 
-    (req, res) => res.json({ data: "ZERO TRUST ACCESS", role: req.userRole })
-);
+app.use('/api/services',serviceRoutes);
+app.use('/',createServiceRoutes);
 
-app.post("/services/pki", 
-    verifyAccess("PKI Management", ["PKI Admin", "Cert Operator", "PKI Auditor"]), 
-    (req, res) => res.json({ data: "PKI ACCESS", role: req.userRole })
-);
 
-app.post("/services/hsm", 
-    verifyAccess("HSM Operation", ["HSM Admin", "Crypto Operator", "HSM Auditor"]), 
-    (req, res) => res.json({ data: "HSM ACCESS", role: req.userRole })
-);
-
-app.post("/services/identity", 
-    verifyAccess("IAM", ["IAM Admin", "Access Operator", "IAM Auditor"]), 
-    (req, res) => res.json({ data: "IAM ACCESS", role: req.userRole })
-);
-
-app.post("/services/security", 
-    verifyAccess("Security Analytics", ["SOC Admin", "SOC Analyst", "Compliance Auditor"]), 
-    (req, res) => res.json({ data: "SECURITY ACCESS", role: req.userRole })
-);
-
-app.post("/services/crypto", 
-    verifyAccess("Crypto Vault", ["Vault Admin", "Secret Operator", "Vault Auditor"]), 
-    (req, res) => res.json({ data: "VAULT ACCESS", role: req.userRole })
-);
 
 app.listen(PORT, () => console.log(`✅ Zero Trust Server running on http://localhost:${PORT}`));

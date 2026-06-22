@@ -4,7 +4,7 @@ import {
   Container, Typography, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, Chip, IconButton, 
   Tooltip, Box, CircularProgress, TextField, MenuItem, Select, 
-  FormControl, Divider, Dialog, DialogTitle, 
+  FormControl, InputLabel, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert
 } from '@mui/material';
 import { 
@@ -13,7 +13,8 @@ import {
   Refresh as ReissueIcon,
   Search as SearchIcon,
   Shield as ShieldIcon,
-  Fingerprint as SerialIcon
+  Fingerprint as SerialIcon,
+  Settings as SettingsIcon // Imported for the Service Management view link
 } from '@mui/icons-material';
 
 const REVOCATION_REASONS = [
@@ -31,6 +32,10 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [fetchingUser, setFetchingUser] = useState(null);
+  
+  const [revokeModal, setRevokeModal] = useState({ open: false, user: null });
+  const [selectedReason, setSelectedReason] = useState('unspecified');
+  
   const navigate = useNavigate();
 
   const fetchUsers = async () => {
@@ -48,7 +53,9 @@ const AdminDashboard = () => {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { 
+    fetchUsers(); 
+  }, []);
 
   const formatDate = (rawDate) => {
     if (!rawDate || rawDate === 'null') return 'N/A';
@@ -63,13 +70,13 @@ const AdminDashboard = () => {
   const filteredUsers = useMemo(() => {
     return users
       .filter((cert) => {
-        const name = cert.username.toLowerCase();
+        const name = cert.username ? cert.username.toLowerCase() : '';
         if (name === "admin") return false;
         const matchesSearch = name.includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'All' || cert.status === statusFilter;
         return matchesSearch && matchesStatus;
       })
-      .sort((a, b) => a.expiration.localeCompare(b.expiration));
+      .sort((a, b) => (a.expiration && b.expiration ? a.expiration.localeCompare(b.expiration) : 0));
   }, [users, searchTerm, statusFilter]);
 
   const handleReissueClick = async (targetUsername) => {
@@ -90,9 +97,41 @@ const AdminDashboard = () => {
     }
   };
 
+  const openRevokeModal = (user) => {
+    setSelectedReason('unspecified');
+    setRevokeModal({ open: true, user });
+  };
+
+  const handleConfirmRevocation = async () => {
+    if (!revokeModal.user) return;
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: revokeModal.user.username,
+          serial: revokeModal.user.serial,
+          reason: selectedReason
+        })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
+      } else {
+        alert("Revocation failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("Revocation network error:", err);
+      alert("Failed to communicate infrastructure change to PKI backend engine.");
+    } finally {
+      setRevokeModal({ open: false, user: null });
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* SECURITY HEADER */}
+      {/* MASTER CONTROL PANEL HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Box display="flex" alignItems="center" gap={1.5}>
           <ShieldIcon color="primary" sx={{ fontSize: 35 }} />
@@ -105,15 +144,29 @@ const AdminDashboard = () => {
             </Typography>
           </Box>
         </Box>
-        <Button 
-          variant="contained" 
-          disableElevation
-          startIcon={<EnrollIcon />} 
-          onClick={() => navigate('/enroll')}
-          sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 700 }}
-        >
-          Enroll Identity
-        </Button>
+        
+        {/* ACTION BUTTON GROUP */}
+        <Box display="flex" gap={2}>
+          {/* SERVICE MANAGEMENT NAVIGATION LINK ENTRY */}
+          <Button
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={() => navigate('/admin/service-managemnt')} // Make sure this matches your exact react-router config path
+            sx={{ borderRadius: 2, fontWeight: 700, borderWidth: '2px', '&:hover': { borderWidth: '2px' } }}
+          >
+            Manage Services
+          </Button>
+
+          <Button 
+            variant="contained" 
+            disableElevation
+            startIcon={<EnrollIcon />} 
+            onClick={() => navigate('/enroll')}
+            sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 700 }}
+          >
+            Enroll Identity
+          </Button>
+        </Box>
       </Box>
 
       {/* FILTER BAR */}
@@ -172,27 +225,24 @@ const AdminDashboard = () => {
                   </TableCell>
                   <TableCell>{formatDate(user.expiration)}</TableCell>
                   <TableCell align="right">
-                    
-                    {/* MODIFIED: Reissue button now disables if status is Revoked */}
                     <Tooltip title={user.status === 'Revoked' ? "Cannot reissue revoked certificate" : "Modify / Reissue"}>
-                        <span> {/* Span wrapper ensures tooltip works on disabled buttons */}
-                          <IconButton 
-                            color="primary" 
-                            size="small" 
-                            onClick={() => handleReissueClick(user.username)}
-                            // Disables if currently fetching OR if the certificate is revoked
-                            disabled={fetchingUser === user.username || user.status === 'Revoked'}
-                          >
-                            {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
-                          </IconButton>
-                        </span>
+                      <span>
+                        <IconButton 
+                          color="primary" 
+                          size="small" 
+                          onClick={() => handleReissueClick(user.username)}
+                          disabled={fetchingUser === user.username || user.status === 'Revoked'}
+                        >
+                          {fetchingUser === user.username ? <CircularProgress size={20} /> : <ReissueIcon fontSize="small" />}
+                        </IconButton>
+                      </span>
                     </Tooltip>
 
                     <IconButton 
                       color="error" 
                       size="small" 
                       disabled={user.status === 'Revoked'} 
-                      onClick={() => handleRevoke(user.username)}
+                      onClick={() => openRevokeModal(user)}
                     >
                       <RevokeIcon fontSize="small" />
                     </IconButton>
@@ -205,20 +255,35 @@ const AdminDashboard = () => {
       </TableContainer>
 
       {/* SECURITY CONFIRMATION DIALOG */}
-      <Dialog open={revokeModal.open} onClose={() => setRevokeModal({ open: false, user: null })}>
+      <Dialog open={revokeModal.open} onClose={() => setRevokeModal({ open: false, user: null })} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Revocation Confirmation</DialogTitle>
         <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This will push Serial <b>{revokeModal.user?.serial}</b> to the CRL.
+          <Alert severity="warning" sx={{ mb: 2, mt: 1 }}>
+            This will push Serial <b>{revokeModal.user?.serial}</b> to the CRL engine.
           </Alert>
-          <Typography variant="body2">
-            Are you sure you want to revoke <b>{revokeModal.user?.username}</b>? 
-            Reason: <b>{revocationReasons[revokeModal.user?.username] || 'unspecified'}</b>.
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            Are you sure you want to invalidate the identity for <b>{revokeModal.user?.username}</b>?
           </Typography>
+          
+          <FormControl fullWidth size="small">
+            <InputLabel id="revocation-reason-label">Reason Code</InputLabel>
+            <Select
+              labelId="revocation-reason-label"
+              label="Reason Code"
+              value={selectedReason}
+              onChange={(e) => setSelectedReason(e.target.value)}
+            >
+              {REVOCATION_REASONS.map((reason) => (
+                <MenuItem key={reason.value} value={reason.value}>
+                  {reason.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
           <Button onClick={() => setRevokeModal({ open: false, user: null })} color="inherit">Cancel</Button>
-          <Button onClick={handleRevoke} variant="contained" color="error" autoFocus>
+          <Button onClick={handleConfirmRevocation} variant="contained" color="error" autoFocus>
             Confirm Revocation
           </Button>
         </DialogActions>
