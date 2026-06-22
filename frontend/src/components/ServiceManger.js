@@ -174,12 +174,12 @@ export default function ServiceManager() {
           <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField label="Service Name" fullWidth value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., HSM Operation" />
             <TextField label="Description" fullWidth multiline rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-            <TextField label="Target Backend URL Route" fullWidth value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="http://localhost:5000/services/..." />
+            <TextField label="Target URL " fullWidth value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="http://localhost:5000/services/..." />
             
             {/* Roles Matrix Construction Section */}
             <Box>
               <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Configure Group Mapping Matrix
+              
               </Typography>
               <Box display="flex" gap={1} mb={2}>
                 <TextField label="Add Role Name" size="small" fullWidth value={roleInput} onChange={(e) => setRoleInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddRole()} />

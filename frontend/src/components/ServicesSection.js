@@ -131,7 +131,7 @@ const ServicesSection = () => {
         <CircularProgress color="inherit" />
         <Typography sx={{ mt: 2, fontFamily: 'monospace', letterSpacing: 1.5, textAlign: 'center' }}>
           {verifying 
-            ? "VALIDATING IDENTITY VIA INTERMEDIARY CA ENGINE..." 
+            ? "Veryfying" 
             : "PROVISIONING CHALLENGE Token & EXECUTING HARDWARE SIGNATURE..."}
         </Typography>
       </Backdrop>
