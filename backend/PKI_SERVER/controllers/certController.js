@@ -10,6 +10,8 @@ const {getUserDetails} = require("../services/pkiServices")
 const BACKEND_ROOT = path.join(__dirname, "..", "..");
 
 exports.enroll = (req, res) => {
+
+    console.log("reached");
     const { username, csr, serviceRoles } = req.body;
 
     if (!username || !csr || !serviceRoles) {
@@ -31,14 +33,16 @@ exports.enroll = (req, res) => {
     }
 
     // args use OPENSSL_DIR which should be the path to openssl.cnf
-    const args = [
-        "ca", "-batch", 
-        "-config", OPENSSL_DIR, 
-        "-name", "intermediate_ca",
-        "-in", csrPath, 
-        "-out", certPath,
-        "-extensions", "usr_cert_dynamic"
-    ];
+   const args = [
+    "ca",
+    "-batch",
+    "-notext",
+    "-config", OPENSSL_DIR,
+    "-name", "intermediate_ca",
+    "-in", csrPath,
+    "-out", certPath,
+    "-extensions", "usr_cert_dynamic"
+];
 
     // CRITICAL: Added cwd: BACKEND_ROOT so OpenSSL finds ./demoCA
     const openssl = spawn("openssl", args, { 

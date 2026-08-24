@@ -1,0 +1,14 @@
+[NewRequest]
+Subject = "CN=vishal, E=vishal@cdac.in, OU=CyberSecurity, O=CDAC, S=Karnataka, C=IN"
+KeyLength = 2048
+KeySpec = 2 
+KeyUsage = 0xA0 
+MachineKeySet = FALSE
+Exportable = FALSE 
+RequestType = PKCS10
+SMIME = FALSE
+ProviderName = "SafeSign Standard Cryptographic Service Provider"
+ProviderType = 1
+KeyContainer = "\\.\Slot1\vishal-20260707094927"
+[EnhancedKeyUsageExtension]
+OID=1.3.6.1.5.5.7.3.2 

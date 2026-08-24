@@ -18,7 +18,7 @@ export const useSecureFetch = (username) => {
       // ------------------------------------------------
       // STEP 1: Get Challenge
       // ------------------------------------------------
-      console.log(`[SecureFetch] Requesting challenge for ${username}...`);
+      console.log(`[SecureFetch] Requesting challenge for ${username}...`); 
       const challengeRes = await fetch(`http://localhost:5000/auth/challenge/${username}`);
       if (!challengeRes.ok) throw new Error("Could not fetch challenge from server.");
       
@@ -31,9 +31,9 @@ export const useSecureFetch = (username) => {
       
       let signRes;
       try {
-        signRes = await fetch('http://localhost:8000/sign-challenge', {
+        signRes = await fetch('http://localhost:8000/api/sign-challenge', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json'},
           body: JSON.stringify({ challenge })
         });
       } catch (e) {
