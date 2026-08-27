@@ -11,66 +11,659 @@ const BACKEND_ROOT = path.join(__dirname, "..", "..");
 
 exports.enroll = (req, res) => {
 
-    console.log("reached");
-    const { username, csr, serviceRoles } = req.body;
+    // ============================================================
+    // 1. READ REQUEST BODY
+    // ============================================================
 
-    if (!username || !csr || !serviceRoles) {
-        return res.status(400).json({ error: "Missing fields" });
+    const {
+        username,
+        csr,
+        serviceRoles
+    } = req.body;
+
+
+    console.log("\n========================================");
+    console.log("        CERTIFICATE ENROLLMENT");
+    console.log("========================================");
+
+    console.log("Username:", username);
+
+    console.log(
+        "Service Roles:",
+        JSON.stringify(serviceRoles, null, 2)
+    );
+
+
+    // ============================================================
+    // 2. VALIDATE REQUIRED FIELDS
+    // ============================================================
+
+    if (!username) {
+
+        return res.status(400).json({
+            success: false,
+            error: "Missing username"
+        });
+
     }
 
-    if (!fs.existsSync(CERT_DIR)) {
-        fs.mkdirSync(CERT_DIR, { recursive: true });
+
+    if (!csr) {
+
+        return res.status(400).json({
+            success: false,
+            error: "Missing CSR"
+        });
+
     }
 
-    const csrPath = path.join(CERT_DIR, `${username}_req.csr`);
-    const certPath = path.join(CERT_DIR, `${username}_cert.pem`);
+
+    if (
+        serviceRoles === undefined ||
+        serviceRoles === null
+    ) {
+
+        return res.status(400).json({
+            success: false,
+            error: "Missing serviceRoles"
+        });
+
+    }
+
+
+    // ============================================================
+    // 3. CREATE CERTIFICATE DIRECTORY
+    // ============================================================
 
     try {
-        const csrData = Array.isArray(csr) ? csr.join("\n") : csr;
-        fs.writeFileSync(csrPath, csrData);
+
+        if (!fs.existsSync(CERT_DIR)) {
+
+            fs.mkdirSync(
+                CERT_DIR,
+                {
+                    recursive: true
+                }
+            );
+
+        }
+
     } catch (err) {
-        return res.status(500).json({ error: "File system error", details: err.message });
+
+        return res.status(500).json({
+            success: false,
+            error: "Could not create certificate directory",
+            details: err.message
+        });
+
     }
 
-    // args use OPENSSL_DIR which should be the path to openssl.cnf
-   const args = [
-    "ca",
-    "-batch",
-    "-notext",
-    "-config", OPENSSL_DIR,
-    "-name", "intermediate_ca",
-    "-in", csrPath,
-    "-out", certPath,
-    "-extensions", "usr_cert_dynamic"
-];
 
-    // CRITICAL: Added cwd: BACKEND_ROOT so OpenSSL finds ./demoCA
-    const openssl = spawn("openssl", args, { 
-        cwd: BACKEND_ROOT,
-        env: { ...process.env, SERVICE_ROLES: serviceRoles } 
-    });
+    // ============================================================
+    // 4. CREATE FILE PATHS
+    // ============================================================
+
+    const safeUsername =
+        username.replace(
+            /[^a-zA-Z0-9_-]/g,
+            "_"
+        );
+
+
+    const csrPath =
+        path.join(
+            CERT_DIR,
+            `${safeUsername}_req.csr`
+        );
+
+
+    const certPath =
+        path.join(
+            CERT_DIR,
+            `${safeUsername}_cert.pem`
+        );
+
+
+    // ============================================================
+    // 5. PREPARE CSR
+    // ============================================================
+
+    try {
+
+        /*
+         * CSR can arrive as:
+         *
+         * String
+         *
+         * OR
+         *
+         * Array of strings
+         */
+
+        const csrData =
+            Array.isArray(csr)
+                ? csr.join("\n")
+                : String(csr);
+
+
+        fs.writeFileSync(
+            csrPath,
+            csrData,
+            "utf8"
+        );
+
+
+        console.log(
+            "CSR written to:",
+            csrPath
+        );
+
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+            error: "CSR file system error",
+            details: err.message
+        });
+
+    }
+
+
+    // ============================================================
+    // 6. PREPARE SERVICE ROLES
+    // ============================================================
+
+    /*
+     * IMPORTANT:
+     *
+     * serviceRoles from your React request is an OBJECT:
+     *
+     * {
+     *     "Crypto Vault": "NA",
+     *     "dummy service": "doaremon",
+     *     "pki services": "NA",
+     *     "Hsm Operation": "c"
+     * }
+     *
+     * We MUST NOT do:
+     *
+     * SERVICE_ROLES: serviceRoles
+     *
+     * because that becomes:
+     *
+     * [object Object]
+     *
+     * Instead we convert it to JSON.
+     */
+
+
+    let serviceRolesString;
+
+
+    try {
+
+        if (
+            typeof serviceRoles === "object" &&
+            serviceRoles !== null
+        ) {
+
+            /*
+             * Remove roles whose value is "NA".
+             *
+             * If you want to keep NA entries, remove this
+             * filtering section and simply use JSON.stringify().
+             */
+
+            const filteredRoles =
+                Object.fromEntries(
+
+                    Object.entries(serviceRoles)
+                        .filter(
+                            ([service, role]) =>
+                                role !== "NA"
+                        )
+
+                );
+
+
+            serviceRolesString =
+                JSON.stringify(filteredRoles);
+
+        } else {
+
+            /*
+             * If serviceRoles is already a string,
+             * use it directly.
+             */
+
+            serviceRolesString =
+                String(serviceRoles);
+
+        }
+
+
+    } catch (err) {
+
+        // Remove CSR if conversion fails
+
+        if (fs.existsSync(csrPath)) {
+            fs.unlinkSync(csrPath);
+        }
+
+
+        return res.status(400).json({
+            success: false,
+            error: "Invalid serviceRoles",
+            details: err.message
+        });
+
+    }
+
+
+    console.log(
+        "SERVICE_ROLES passed to OpenSSL:"
+    );
+
+    console.log(
+        serviceRolesString
+    );
+
+
+    // ============================================================
+    // 7. OPENSSL COMMAND
+    // ============================================================
+
+    const args = [
+
+        "ca",
+
+        "-batch",
+
+        "-notext",
+
+        "-config",
+        OPENSSL_DIR,
+
+        "-name",
+        "intermediate_ca",
+
+        "-in",
+        csrPath,
+
+        "-out",
+        certPath,
+
+        "-extensions",
+        "usr_cert_dynamic"
+
+    ];
+
+
+    console.log("\nOpenSSL command:");
+
+    console.log(
+        "openssl",
+        args.join(" ")
+    );
+
+
+    // ============================================================
+    // 8. OPENSSL ENVIRONMENT
+    // ============================================================
+
+    const opensslEnv = {
+
+        ...process.env,
+
+        /*
+         * THIS IS THE IMPORTANT FIX.
+         *
+         * Do NOT pass the JavaScript object directly.
+         */
+
+        SERVICE_ROLES:
+            serviceRolesString
+
+    };
+
+
+    console.log(
+        "\nOpenSSL SERVICE_ROLES:"
+    );
+
+    console.log(
+        opensslEnv.SERVICE_ROLES
+    );
+
+
+    // ============================================================
+    // 9. START OPENSSL
+    // ============================================================
+
+    let openssl;
+
+
+    try {
+
+        openssl =
+            spawn(
+                "openssl",
+                args,
+                {
+                    cwd: BACKEND_ROOT,
+                    env: opensslEnv
+                }
+            );
+
+    } catch (err) {
+
+        if (fs.existsSync(csrPath)) {
+            fs.unlinkSync(csrPath);
+        }
+
+        return res.status(500).json({
+            success: false,
+            error: "OpenSSL execution failed",
+            details: err.message
+        });
+
+    }
+
+
+    // ============================================================
+    // 10. COLLECT STDERR
+    // ============================================================
 
     let stderrData = "";
-    openssl.stderr.on("data", (data) => { stderrData += data.toString(); });
 
-    openssl.on("error", (err) => {
-        return res.status(500).json({ error: "OpenSSL execution failed", details: err.message });
-    });
+    let stdoutData = "";
 
-    openssl.on("close", (code) => {
-        if (fs.existsSync(csrPath)) fs.unlinkSync(csrPath);
 
-        if (code !== 0) {
-            return res.status(500).json({ error: "Signing failed", details: stderrData });
+    openssl.stderr.on(
+        "data",
+        (data) => {
+
+            const text =
+                data.toString();
+
+            stderrData += text;
+
+            console.log(
+                "[OpenSSL STDERR]",
+                text
+            );
+
         }
+    );
 
-        try {
-            const certificate = fs.readFileSync(certPath, "utf8");
-            res.json({ success: true, certificate: certificate });
-        } catch (readErr) {
-            res.status(500).json({ error: "Read failed", details: readErr.message });
+
+    openssl.stdout.on(
+        "data",
+        (data) => {
+
+            const text =
+                data.toString();
+
+            stdoutData += text;
+
+            console.log(
+                "[OpenSSL STDOUT]",
+                text
+            );
+
         }
-    });
+    );
+
+
+    // ============================================================
+    // 11. HANDLE PROCESS ERROR
+    // ============================================================
+
+    openssl.on(
+        "error",
+        (err) => {
+
+            console.error(
+                "OpenSSL process error:",
+                err
+            );
+
+
+            // Delete CSR
+
+            if (fs.existsSync(csrPath)) {
+
+                try {
+                    fs.unlinkSync(csrPath);
+                } catch (e) {
+                    console.error(
+                        "Could not delete CSR:",
+                        e
+                    );
+                }
+
+            }
+
+
+            // Delete certificate if partially created
+
+            if (fs.existsSync(certPath)) {
+
+                try {
+                    fs.unlinkSync(certPath);
+                } catch (e) {
+                    console.error(
+                        "Could not delete certificate:",
+                        e
+                    );
+                }
+
+            }
+
+
+            if (!res.headersSent) {
+
+                return res.status(500).json({
+
+                    success: false,
+
+                    error:
+                        "OpenSSL execution failed",
+
+                    details:
+                        err.message
+
+                });
+
+            }
+
+        }
+    );
+
+
+    // ============================================================
+    // 12. HANDLE OPENSSL EXIT
+    // ============================================================
+
+    openssl.on(
+        "close",
+        (code) => {
+
+            console.log(
+                `OpenSSL exited with code: ${code}`
+            );
+
+
+            // ====================================================
+            // DELETE CSR
+            // ====================================================
+
+            if (fs.existsSync(csrPath)) {
+
+                try {
+
+                    fs.unlinkSync(csrPath);
+
+                    console.log(
+                        "Temporary CSR deleted."
+                    );
+
+                } catch (err) {
+
+                    console.error(
+                        "Could not delete CSR:",
+                        err
+                    );
+
+                }
+
+            }
+
+
+            // ====================================================
+            // OPENSSL FAILED
+            // ====================================================
+
+            if (code !== 0) {
+
+                console.error(
+                    "OpenSSL signing failed."
+                );
+
+                console.error(
+                    "OpenSSL stderr:",
+                    stderrData
+                );
+
+
+                // Delete failed certificate
+
+                if (fs.existsSync(certPath)) {
+
+                    try {
+
+                        fs.unlinkSync(certPath);
+
+                    } catch (err) {
+
+                        console.error(
+                            "Could not delete failed certificate:",
+                            err
+                        );
+
+                    }
+
+                }
+
+
+                return res.status(500).json({
+
+                    success: false,
+
+                    error:
+                        "Certificate signing failed",
+
+                    details:
+                        stderrData ||
+                        "OpenSSL returned a non-zero exit code."
+
+                });
+
+            }
+
+
+            // ====================================================
+            // 13. CHECK CERTIFICATE EXISTS
+            // ====================================================
+
+            if (!fs.existsSync(certPath)) {
+
+                console.error(
+                    "OpenSSL completed successfully but certificate was not created."
+                );
+
+
+                return res.status(500).json({
+
+                    success: false,
+
+                    error:
+                        "Certificate file was not generated"
+
+                });
+
+            }
+
+
+            // ====================================================
+            // 14. READ CERTIFICATE
+            // ====================================================
+
+            try {
+
+                const certificate =
+                    fs.readFileSync(
+                        certPath,
+                        "utf8"
+                    );
+
+
+                console.log(
+                    "\nCertificate generated successfully."
+                );
+
+
+                console.log(
+                    "Certificate path:",
+                    certPath
+                );
+
+
+                // =================================================
+                // 15. RETURN RESPONSE
+                // =================================================
+
+                return res.json({
+
+                    success: true,
+
+                    username: username,
+
+                    serviceRoles:
+                        serviceRolesString,
+
+                    certificate:
+                        certificate
+
+                });
+
+
+            } catch (err) {
+
+                console.error(
+                    "Certificate read error:",
+                    err
+                );
+
+
+                return res.status(500).json({
+
+                    success: false,
+
+                    error:
+                        "Could not read generated certificate",
+
+                    details:
+                        err.message
+
+                });
+
+            }
+
+        }
+    );
+
 };
 
 exports.revoke = (req, res) => {
