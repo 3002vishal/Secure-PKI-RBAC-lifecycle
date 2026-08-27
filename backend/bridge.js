@@ -502,6 +502,7 @@ process.on('uncaughtException', (err) => {
     process.stdin.resume();
 });
 
+
 app.listen(PORT, () => {
     console.log(`HSM Bridge running on http://localhost:${PORT}`);
 });
