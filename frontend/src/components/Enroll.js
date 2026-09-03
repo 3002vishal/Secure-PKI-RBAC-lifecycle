@@ -37,6 +37,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { useToken } from '../context/TokenContext';
 
 
 // --------------------------------------------------
@@ -118,7 +119,20 @@ export default function App() {
   // TOKEN PIN
   // --------------------------------------------------
 
-  const [pin, setPin] = useState('');
+  
+  const {   selectedToken,
+
+        tokenPin,
+
+        selectToken,
+
+        clearSelectedToken,
+      } = useToken();
+  console.log("toekn pin", tokenPin);
+  console.log("selectedToken",selectToken);
+  console.log("selectToken", selectToken);
+  console.log("clearsectedToken",clearSelectedToken);
+
 
 
   // --------------------------------------------------
@@ -327,7 +341,7 @@ export default function App() {
     const cleanLocality = locality.trim();
     const cleanState = state.trim();
     const cleanCountry = country.trim().toUpperCase();
-    const cleanPin = pin.trim();
+    const cleanPin = tokenPin;
 
 
     // --------------------------------------------------
@@ -447,34 +461,155 @@ export default function App() {
   // NEXT STEP
   // --------------------------------------------------
 
-  const handleNext = () => {
+ // --------------------------------------------------
+// CHECK USERNAME AVAILABILITY
+// --------------------------------------------------
+
+const checkUsernameAvailability = async () => {
+    const cleanUsername = username.trim();
+
+    try {
+        const response = await fetch(
+            'http://localhost:5000/find',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: cleanUsername
+                })
+            }
+        );
+
+        const result = await response.json();
+
+        console.log('Username check response:', result);
+
+        if (!response.ok) {
+            throw new Error(
+                result.message ||
+                result.error ||
+                `Username check failed with HTTP ${response.status}`
+            );
+        }
+
+        return result.exists === true;
+
+    } catch (error) {
+
+        console.error(
+            'Username availability check failed:',
+            error
+        );
+
+        setStatus({
+            type: 'error',
+            msg: `Unable to check username availability: ${error.message}`
+        });
+
+        return null;
+    }
+};
+
+
+// --------------------------------------------------
+// NEXT STEP
+// --------------------------------------------------
+
+const handleNext = async () => {
+
+    // -----------------------------------------------
+    // STEP 1 → STEP 2
+    // -----------------------------------------------
 
     if (activeStep === 0) {
 
-      if (!validatePersonalInfo()) {
-        return;
-      }
+        // First perform normal validation
+        if (!validatePersonalInfo()) {
+            return;
+        }
 
+        // -------------------------------------------
+        // CHECK USERNAME IN CERT DIRECTORY
+        // -------------------------------------------
+
+        setLoading(true);
+
+        setStatus({
+            type: 'info',
+            msg: 'Checking username availability...'
+        });
+
+        const usernameExists =
+            await checkUsernameAvailability();
+
+        setLoading(false);
+
+        // API error
+        if (usernameExists === null) {
+            return;
+        }
+
+        // -------------------------------------------
+        // USERNAME ALREADY EXISTS
+        // -------------------------------------------
+
+        if (usernameExists) {
+
+            setStatus({
+                type: 'warning',
+                msg: 'This username is already used. Please choose a different username.'
+            });
+
+            addLog(
+                `Username "${username.trim()}" is already registered.`,
+                'warning'
+            );
+
+            return;
+        }
+
+        // -------------------------------------------
+        // USERNAME IS AVAILABLE
+        // -------------------------------------------
+
+        setStatus({
+            type: '',
+            msg: ''
+        });
+
+        addLog(
+            `Username "${username.trim()}" is available.`,
+            'success'
+        );
     }
 
+
+    // -----------------------------------------------
+    // STEP 2 → STEP 3
+    // -----------------------------------------------
 
     if (activeStep === 1) {
 
-      if (!validateServiceRoles()) {
-        return;
-      }
-
+        if (!validateServiceRoles()) {
+            return;
+        }
     }
 
 
+    // -----------------------------------------------
+    // MOVE TO NEXT STEP
+    // -----------------------------------------------
+
     setStatus({
-      type: '',
-      msg: ''
+        type: '',
+        msg: ''
     });
 
     setActiveStep(prev => prev + 1);
-
-  };
+};
 
 
   // --------------------------------------------------
@@ -546,7 +681,7 @@ export default function App() {
       const cleanLocality = locality.trim();
       const cleanState = state.trim();
       const cleanCountry = country.trim().toUpperCase();
-      const cleanPin = pin.trim();
+      const cleanPin = tokenPin;
 
 
       // --------------------------------------------------
@@ -595,7 +730,7 @@ export default function App() {
         state: cleanState,
         country: cleanCountry,
         serviceRoles: selectedServiceRoles,
-        pin: cleanPin
+        pin: tokenPin
       };
 
 
@@ -1240,31 +1375,7 @@ export default function App() {
                   sm={6}
                 >
 
-                  <TextField
-                    label="Token PIN"
-                    type="password"
-                    variant="outlined"
-                    fullWidth
-                    required
-                    value={pin}
-
-                    onChange={(e) =>
-                      setPin(e.target.value)
-                    }
-
-                    disabled={loading}
-
-                    InputProps={{
-                      startAdornment: (
-                        <VpnKeyIcon
-                          sx={{
-                            mr: 1,
-                            color: 'action.active'
-                          }}
-                        />
-                      )
-                    }}
-                  />
+                 
 
                 </Grid>
 
