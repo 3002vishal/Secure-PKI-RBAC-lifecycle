@@ -154,7 +154,7 @@ const ServicesSection = () => {
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2" sx={{ color: '#00ff41', fontWeight: 'bold', fontFamily: 'monospace' }}>
-              PRINCIPAL: {username?.toUpperCase()}
+              user: {username?.toUpperCase()}
             </Typography>
             <Button variant="contained" color="error" size="small" onClick={() => navigate('/')} startIcon={<Logout />}>
               Logout

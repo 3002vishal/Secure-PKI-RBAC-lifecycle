@@ -9,6 +9,61 @@ const {getUserDetails} = require("../services/pkiServices")
 // 1. Define the absolute path to the backend root (Two levels up from controllers)
 const BACKEND_ROOT = path.join(__dirname, "..", "..");
 
+
+exports.find = (req, res) => {
+    try {
+        const { username } = req.body;
+
+        // Validate username
+        if (!username || typeof username !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "Username is required"
+            });
+        }
+
+        const requestedUsername = username.trim().toLowerCase();
+
+        // Read all files from certificate directory
+        const files = fs.readdirSync(CERT_DIR);
+
+        // Check for exact username certificate
+        const certificateExists = files.some(file => {
+            const extension = path.extname(file).toLowerCase();
+
+            // Only consider certificate files
+            if (extension !== ".pem" && extension !== ".crt") {
+                return false;
+            }
+
+            // Remove extension
+            const filename = path.basename(file, extension);
+
+            // Remove "_cert" suffix
+            const certUsername = filename
+                .replace(/_cert$/i, "")
+                .trim()
+                .toLowerCase();
+
+            return certUsername === requestedUsername;
+        });
+
+        return res.status(200).json({
+            success: true,
+            username: username,
+            exists: certificateExists
+        });
+
+    } catch (error) {
+        console.error("Error checking username:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to check username"
+        });
+    }
+}; 
+
 exports.enroll = (req, res) => {
 
     // ============================================================

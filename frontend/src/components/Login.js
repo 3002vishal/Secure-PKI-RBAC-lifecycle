@@ -20,6 +20,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import UsbIcon from "@mui/icons-material/Usb";
 
 // Ensure this path is 100% correct and useSecureFetch is a named export
 import { useSecureFetch } from '../hooks/useSecureFetch';
@@ -100,7 +101,7 @@ function Login() {
           navigate(targetPath, { state: { username: username } });
         }, 1500);
       } else {
-        addLog("Authentication Failed. Signature rejected by server.", "error");
+        addLog("Private key could not be found on your token");
       }
 
     } catch (err) {
@@ -169,7 +170,7 @@ function Login() {
                   startIcon={<DownloadIcon />}
                   href="/hsm-bridge.exe" 
                   download="hsm-bridge.exe"
-                  onClick={() => addLog("HSM Bridge download initiated.", "info")}
+                  onClick={() => addLog("Bridge download initiated.", "info")}
                   sx={{ 
                     borderStyle: 'dashed',
                     color: 'text.secondary',
@@ -177,7 +178,23 @@ function Login() {
                     '&:hover': { borderColor: 'primary.main', borderStyle: 'solid' }
                   }}
                 >
-                  Download HSM Bridge
+                  Download Bridge
+                </Button>
+              </Box>
+
+              <Box sx ={{mt:2}}>
+                <Button 
+                variant= "outlined"
+                fullWidth
+                startIcon={<UsbIcon/>}
+                onClick={()=>navigate("/connected-tokens")}
+                  sx= {{
+                    height:50, 
+                    fontWeight: "bold",
+                    borderRadius:2,
+                  }}
+                >
+                  View Connected Tokens
                 </Button>
               </Box>
 

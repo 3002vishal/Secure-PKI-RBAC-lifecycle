@@ -34,3 +34,23 @@ V	270825115031Z		1021	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=te
 V	270825120354Z		1022	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test107
 V	270825120706Z		1023	unknown	/C=IN/ST=dslakfj/L=fdsalfj/O=fdlskj/OU=dafjkflj/CN=test110
 V	270825122632Z		1024	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=cdac/CN=test111
+R	270827094824Z	260827094954Z,keyCompromise	1025	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=None/CN=test112
+V	270828060236Z		1026	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test120
+V	270828060400Z		1027	unknown	/C=IN/ST=cdac/L=cdacd/O=cdac/OU=cdac/CN=test121
+V	270828062705Z		1028	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test122
+V	270828065802Z		1029	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test124
+V	270828083950Z		102A	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test128
+V	270828085448Z		102B	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test133
+V	270828090817Z		102C	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test134
+V	270828095818Z		102D	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=test135
+V	270828100108Z		102E	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=None/CN=test136
+V	270831080654Z		102F	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=None/CN=test137
+V	270831082332Z		1030	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=None/CN=test138
+V	270831092540Z		1031	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=None/CN=test139
+V	270831102247Z		1032	unknown	/C=IN/ST=Jharkhand/L=Ranchi/O=None/OU=cdac/CN=test140
+V	270831122339Z		1033	unknown	/C=IN/ST=Bihar/L=Patna/O=None/OU=None/CN=test141
+V	270902093103Z		1034	unknown	/C=IN/ST=Bihar/L=Patna/O=None/OU=None/CN=test144
+V	270902100313Z		1035	unknown	/C=IN/ST=Karnataka/L=Bangalore/O=CDAC/OU=PKI/CN=admin
+V	270902114023Z		1036	unknown	/C=IN/ST=Karnataka/L=Bengaluru/O=None/OU=None/CN=test145
+V	270903084031Z		1037	unknown	/C=IN/ST=Bihar/L=Patna/O=None/OU=None/CN=visallkdjfl
+V	270903092357Z		1038	unknown	/C=IN/ST=Bihar/L=Patna/O=None/OU=None/CN=test148

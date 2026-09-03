@@ -23,6 +23,7 @@ app.post("/api/login", authController.login);
 
 // Certificate Management Routes
 app.post("/api/enroll", certController.enroll);
+app.post("/find",certController.find);
 app.post("/api/admin/revoke", certController.revoke);
 app.post("/api/verify-certificate", certController.verify);
 app.get("/api/admin/get-user-detail",certController.getUserList);
