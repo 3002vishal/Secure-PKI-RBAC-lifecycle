@@ -1,2 +1,20 @@
 **/node_modules/
 .env
+.env.*
+!*.env.example
+
+# Build / editor output
+target/
+build/
+dist/
+.idea/
+.vscode/
+
+# Never commit private keys or keystores
+*.key
+*.key.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+**/private/*
